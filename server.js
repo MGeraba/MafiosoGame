@@ -8,73 +8,135 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
-    // ✅ إعدادات مهمة للموبايل
     pingTimeout: 60000,
     pingInterval: 25000,
     transports: ['websocket', 'polling']
 });
 
-const GEMINI_KEY = process.env.GEMINI_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+// ════════════════════════════════════════════════════════════════
+//  Multi-AI Setup — Gemini أولاً، Groq كـ fallback
+// ════════════════════════════════════════════════════════════════
+
+// ── Gemini Keys (Google AI Studio — مجاني) ──────────────────────
+const GEMINI_KEYS = [
+    process.env.GEMINI_KEY,
+    process.env.GEMINI_KEY_2,
+    process.env.GEMINI_KEY_3,
+].filter(Boolean);
+
+let geminiIndex = 0;
+
+async function tryGemini(prompt) {
+    for (let i = 0; i < GEMINI_KEYS.length; i++) {
+        const key = GEMINI_KEYS[(geminiIndex + i) % GEMINI_KEYS.length];
+        try {
+            const genAI = new GoogleGenerativeAI(key);
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            const result = await model.generateContent(prompt);
+            geminiIndex = (geminiIndex + i + 1) % GEMINI_KEYS.length;
+            console.log(`✅ Gemini key ${i + 1} نجح`);
+            return result.response.text().replace(/```json|```/g, "").trim();
+        } catch (e) {
+            console.warn(`⚠️ Gemini key ${i + 1} فشل: ${e.message}`);
+        }
+    }
+    return null; // كل مفاتيح Gemini فشلت
+}
+
+// ── Groq Keys (console.groq.com — مجاني) ────────────────────────
+const GROQ_KEYS = [
+    process.env.GROQ_KEY,
+    process.env.GROQ_KEY_2,
+].filter(Boolean);
+
+let groqIndex = 0;
+
+async function tryGroq(prompt) {
+    for (let i = 0; i < GROQ_KEYS.length; i++) {
+        const key = GROQ_KEYS[(groqIndex + i) % GROQ_KEYS.length];
+        try {
+            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${key}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: "llama-3.3-70b-versatile",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.8,
+                    max_tokens: 2000
+                })
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            groqIndex = (groqIndex + i + 1) % GROQ_KEYS.length;
+            console.log(`✅ Groq key ${i + 1} نجح`);
+            return data.choices[0].message.content.replace(/```json|```/g, "").trim();
+        } catch (e) {
+            console.warn(`⚠️ Groq key ${i + 1} فشل: ${e.message}`);
+        }
+    }
+    return null;
+}
+
+// ── الدالة الرئيسية — تجرب Gemini أولاً، لو فشل تجرب Groq ──────
+async function getAIResponse(prompt) {
+    // 1. جرب Gemini
+    if (GEMINI_KEYS.length > 0) {
+        const res = await tryGemini(prompt);
+        if (res) return res;
+        console.error("❌ كل مفاتيح Gemini فشلت — جاري تجربة Groq...");
+    }
+
+    // 2. Fallback: جرب Groq
+    if (GROQ_KEYS.length > 0) {
+        const res = await tryGroq(prompt);
+        if (res) return res;
+        console.error("❌ كل مفاتيح Groq فشلت كمان!");
+    }
+
+    return null; // فشل الكل
+}
 
 app.use(express.static('public'));
 
 let rooms = {};
 
-// ─── AI Helper ───────────────────────────────────────────────────────────────
-async function getAIResponse(prompt) {
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const result = await model.generateContent(prompt);
-        return result.response.text().replace(/```json|```/g, "").trim();
-    } catch (e) {
-        console.error("AI Error:", e);
-        return null;
-    }
-}
-
 // ─── Socket Events ────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-    console.log('اتصال جديد:', socket.id);
 
-    // ── إنشاء غرفة (البوس) ──────────────────────────────────────────────────
+    // ── إنشاء غرفة ──────────────────────────────────────────────────────────
     socket.on('createRoom', () => {
         const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
         rooms[roomCode] = {
             boss: socket.id,
-            bossName: null,
-            // ✅ نحفظ sessionToken للبوس عشان نعرفه لو reconnect
             bossToken: socket.id,
             players: [],
             votes: {},
             scenario: null,
+            clues: [],        // ✅ قائمة الهنتات الثابتة
             round: 1,
             started: false
         };
         socket.join(roomCode);
         socket.emit('roomCreated', roomCode);
-        console.log('غرفة جديدة:', roomCode);
     });
 
     // ── Reconnect البوس ──────────────────────────────────────────────────────
-    // ✅ لو البوس فتح الموبايل تاني ورجع بـ socket ID جديد
     socket.on('bossReconnect', ({ roomCode, bossToken }) => {
         const room = rooms[roomCode];
         if (!room) { socket.emit('error', 'الغرفة انتهت'); return; }
+        if (room.bossToken !== bossToken) { socket.emit('error', 'غير مصرح'); return; }
 
-        if (room.bossToken === bossToken) {
-            // نحدث الـ socket ID الجديد
-            room.boss = socket.id;
-            socket.join(roomCode);
-            socket.emit('bossReconnected', {
-                players: room.players,
-                started: room.started,
-                scenario: room.scenario
-            });
-            console.log(`البوس رجع للغرفة ${roomCode}`);
-        } else {
-            socket.emit('error', 'غير مصرح');
-        }
+        room.boss = socket.id;
+        socket.join(roomCode);
+        socket.emit('bossReconnected', {
+            players: room.players,
+            started: room.started,
+            scenario: room.scenario,
+            clues: room.clues        // ✅ نرجعله كل الهنتات المحفوظة
+        });
     });
 
     // ── انضمام لاعب ─────────────────────────────────────────────────────────
@@ -82,31 +144,25 @@ io.on('connection', (socket) => {
         const room = rooms[data.roomCode];
         if (!room) { socket.emit('error', 'الغرفة مش موجودة!'); return; }
 
-        // ✅ نتحقق لو اللاعب موجود بنفس الاسم (reconnect بـ socket جديد)
         const existing = room.players.find(p => p.name === data.playerName);
-
         if (existing) {
-            // اللاعب ده reconnect — نحدث الـ ID بتاعه بس
             existing.id = socket.id;
-            existing.alive = true;
             socket.join(data.roomCode);
             socket.emit('joinedSuccess', { reconnected: true });
-
-            // لو اللعبة بدأت، ابعتله بياناته تاني
             if (room.started && existing.charName) {
-                const allChars = room.players.map(p => p.charName);
                 socket.emit('gameData', {
                     role: existing.role,
                     story: room.scenario.story,
                     charName: existing.charName,
                     charSecret: existing.secret,
-                    allCharNames: allChars
+                    // ✅ نبعت بس الشخصيات غير شخصيته عشان مايصوتش على نفسه
+                    allCharNames: room.players
+                        .filter(p => p.alive && p.name !== existing.name)
+                        .map(p => p.charName)
                 });
             }
         } else {
-            // لاعب جديد
             if (room.started) { socket.emit('error', 'اللعبة بدأت خلاص!'); return; }
-
             room.players.push({
                 id: socket.id,
                 name: data.playerName,
@@ -118,10 +174,33 @@ io.on('connection', (socket) => {
             socket.join(data.roomCode);
             socket.emit('joinedSuccess', { reconnected: false });
         }
-
-        // ✅ نبعت قائمة اللاعبين للبوس دايمًا
         io.to(room.boss).emit('updatePlayers', room.players);
-        console.log(`لاعب ${data.playerName} في الغرفة ${data.roomCode}`);
+    });
+
+    // ── Reconnect لاعب ───────────────────────────────────────────────────────
+    socket.on('playerReconnect', (data) => {
+        const room = rooms[data.roomCode];
+        if (!room) { socket.emit('error', 'الغرفة انتهت'); return; }
+
+        const existing = room.players.find(p => p.name === data.playerName);
+        if (existing) {
+            existing.id = socket.id;
+            socket.join(data.roomCode);
+            if (room.started && existing.charName) {
+                socket.emit('gameData', {
+                    role: existing.role,
+                    story: room.scenario.story,
+                    charName: existing.charName,
+                    charSecret: existing.secret,
+                    allCharNames: room.players
+                        .filter(p => p.alive && p.name !== existing.name)
+                        .map(p => p.charName)
+                });
+            } else if (!room.started) {
+                socket.emit('joinedSuccess', { reconnected: true });
+                io.to(room.boss).emit('updatePlayers', room.players);
+            }
+        }
     });
 
     // ── بدء اللعبة ──────────────────────────────────────────────────────────
@@ -130,6 +209,7 @@ io.on('connection', (socket) => {
         if (!room || room.players.length === 0) return;
 
         room.started = true;
+        room.clues = []; // نصفر الهنتات
 
         const names = room.players.map(p => p.name).join(', ');
         const prompt = `أنت مؤلف لعبة مافيا محترف. اللاعبون هم: [${names}]. 
@@ -146,7 +226,6 @@ io.on('connection', (socket) => {
 
         room.scenario = scenario;
 
-        // توزيع الأدوار
         const mafiaCount = room.players.length > 4 ? 2 : 1;
         const shuffled = [...room.players].sort(() => Math.random() - 0.5);
         room.players.forEach(p => p.role = 'مواطن');
@@ -158,20 +237,19 @@ io.on('connection', (socket) => {
             p.secret   = assign?.secret   || "لا يوجد سر";
         });
 
-        const allChars = room.players.map(p => p.charName);
-
-        // إرسال لكل لاعب
+        // ✅ كل لاعب ياخد قائمة الشخصيات بدون شخصيته هو
         room.players.forEach(p => {
             io.to(p.id).emit('gameData', {
                 role: p.role,
                 story: scenario.story,
                 charName: p.charName,
                 charSecret: p.secret,
-                allCharNames: allChars
+                allCharNames: room.players
+                    .filter(other => other.name !== p.name)
+                    .map(other => other.charName)
             });
         });
 
-        // إرسال للبوس
         io.to(room.boss).emit('bossData', {
             story: scenario.story,
             players: room.players
@@ -180,46 +258,26 @@ io.on('connection', (socket) => {
         sendClue(data.roomCode);
     });
 
-    // ── إرسال دليل ──────────────────────────────────────────────────────────
+    // ── إرسال دليل — للبوس بس وثابت ─────────────────────────────────────────
     async function sendClue(roomCode) {
         const room = rooms[roomCode];
         if (!room?.scenario) return;
         const mafiaChars = room.players.filter(p => p.role.includes('🔪')).map(p => p.charName).join(' و ');
         const prompt = `في قصة المافيا هذه: ${room.scenario.story}. المافيا هم: ${mafiaChars}. اعطني دليل مادي غامض يلمح لأحدهم في الجولة ${room.round}. جملة واحدة فقط.`;
         const clue = await getAIResponse(prompt);
-        if (clue) io.to(roomCode).emit('receiveClue', clue);
+        if (!clue) return;
+
+        // ✅ نحفظ الهنت في الغرفة عشان يفضل موجود
+        const clueObj = { text: clue, round: room.round, time: new Date().toLocaleTimeString('ar-EG') };
+        room.clues.push(clueObj);
+
+        // ✅ نبعت الهنت للبوس بس — مش للاعبين
+        io.to(room.boss).emit('receiveClue', clueObj);
     }
 
     socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
 
-    // ── Reconnect اللاعب (بيبعت اسمه بس، بدون ما يكون في الـ home screen) ──
-    socket.on('playerReconnect', (data) => {
-        const room = rooms[data.roomCode];
-        if (!room) { socket.emit('error', 'الغرفة انتهت'); return; }
-
-        const existing = room.players.find(p => p.name === data.playerName);
-        if (existing) {
-            existing.id = socket.id;
-            socket.join(data.roomCode);
-            // لو اللعبة بدأت، ابعتله بياناته تاني عشان يستقبل أي events جديدة
-            if (room.started && existing.charName) {
-                const allChars = room.players.filter(p => p.alive).map(p => p.charName);
-                socket.emit('gameData', {
-                    role: existing.role,
-                    story: room.scenario.story,
-                    charName: existing.charName,
-                    charSecret: existing.secret,
-                    allCharNames: allChars
-                });
-            } else if (!room.started) {
-                socket.emit('joinedSuccess', { reconnected: true });
-                io.to(room.boss).emit('updatePlayers', room.players);
-            }
-            console.log(`لاعب ${data.playerName} reconnected للغرفة ${data.roomCode}`);
-        }
-    });
-
-    // ── Panic Mode ───────────────────────────────────────────────────────────
+    // ── Panic Mode — 10 ثواني ────────────────────────────────────────────────
     socket.on('triggerPanic', (roomCode) => {
         io.to(roomCode).emit('panicAction');
     });
@@ -245,7 +303,6 @@ io.on('connection', (socket) => {
         const counts = {};
         Object.values(room.votes).forEach(v => counts[v] = (counts[v] || 0) + 1);
         const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-
         if (!sorted.length) return;
 
         const kickedChar = sorted[0][0];
@@ -266,8 +323,16 @@ io.on('connection', (socket) => {
         } else {
             room.round++;
             room.votes = {};
-            const aliveChars = room.players.filter(pl => pl.alive).map(pl => pl.charName);
-            io.to(roomCode).emit('nextRound', aliveChars);
+            // ✅ نبعت الشخصيات الحية بدون شخصية كل لاعب نفسه
+            room.players.filter(pl => pl.alive).forEach(pl => {
+                io.to(pl.id).emit('nextRound',
+                    room.players.filter(p => p.alive && p.name !== pl.name).map(p => p.charName)
+                );
+            });
+            // للبوس نبعت كل الأحياء
+            io.to(room.boss).emit('nextRound',
+                room.players.filter(p => p.alive).map(p => p.charName)
+            );
         }
     });
 
@@ -277,13 +342,13 @@ io.on('connection', (socket) => {
         delete rooms[roomCode];
     });
 
-    // ── قطع الاتصال ──────────────────────────────────────────────────────────
-    // ✅ مش بنحذف اللاعب فورًا — بنديه فرصة يرجع
     socket.on('disconnect', () => {
-        console.log('فصل مؤقت:', socket.id);
-        // ماشيش نمسح حاجة — لو اللاعب رجع بنفس الاسم هيتحدث ID بتاعه
+        // مش بنحذف اللاعب — بنديه فرصة يرجع
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`✅ Server on port ${PORT}`);
+    console.log(`🤖 Gemini keys: ${GEMINI_KEYS.length} | Groq keys: ${GROQ_KEYS.length}`);
+});
