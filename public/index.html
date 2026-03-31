@@ -127,23 +127,40 @@ socket.on('disconnect', () => {
 
 // ✅ لما يتصل تاني، نحاول نرجع للغرفة
 socket.on('connect', () => {
-    connBar.textContent = '✅ رجع الاتصال!';
-    connBar.className = 'online';
-
     const sess = loadSession();
-    if (!sess.code) return;
+    if (!sess.code) return; // اتصال أول مرة، مفيش session
+
+    // نحدث connBar بس لو كان فيه انقطاع فعلي (مش أول اتصال)
+    if (sess._wasConnected) {
+        connBar.textContent = '✅ رجع الاتصال!';
+        connBar.className = 'online';
+    }
+    sess._wasConnected = true;
+    saveSession(sess);
 
     myCode = sess.code;
     myName = sess.name;
     isBoss = sess.isBoss;
 
     if (isBoss) {
-        // ✅ البوس يتحقق ويرجع للغرفة
         socket.emit('bossReconnect', { roomCode: sess.code, bossToken: sess.bossToken });
     } else {
-        // ✅ اللاعب يتحقق ويرجع للغرفة بنفس اسمه
-        socket.emit('joinRoom', { roomCode: sess.code, playerName: sess.name });
+        // ✅ لو عنده gameData محفوظة — اعرضها فورًا بدون ما تستنى السيرفر
+        if (sess.gameData) {
+            restorePlayerScreen(sess.gameData, sess.hasVoted);
+        } else {
+            // لسه مستنى اللعبة تبدأ
+            show('waitingScreen');
+            document.getElementById('waiting-name').textContent = 'مرحباً، ' + myName + ' 👋';
+        }
+        // في كل الحالات نبعت للسيرفر عشان يحدث الـ socket ID
+        socket.emit('playerReconnect', { roomCode: sess.code, playerName: sess.name });
     }
+});
+
+socket.on('disconnect', () => {
+    connBar.textContent = '⚠️ انقطع الاتصال — جاري إعادة الاتصال...';
+    connBar.className = 'offline';
 });
 
 // ════════════════════════════════════════════════
@@ -199,11 +216,11 @@ function joinRoom() {
 
 socket.on('joinedSuccess', (data) => {
     if (!data?.reconnected) {
-        // ✅ انضمام جديد — نبيّن شاشة الانتظار
         show('waitingScreen');
         document.getElementById('waiting-name').textContent = 'مرحباً، ' + myName + ' 👋';
     }
-    // لو reconnect والعبة بدأت، هيجيه gameData تاني من السيرفر
+    // reconnected=true: الشاشة بتتعرض من localStorage (فوق في connect handler)
+    // لو اللعبة بدأت، السيرفر بيبعت gameData تاني تلقائيًا
 });
 
 // ════════════════════════════════════════════════
@@ -246,10 +263,14 @@ function startGame() {
 //  بيانات اللاعب
 // ════════════════════════════════════════════════
 socket.on('gameData', (d) => {
-    // نحفظ بيانات اللاعب محليًا للـ reconnect
     const sess = loadSession();
+    const alreadyVoted = sess.hasVoted || false;
     saveSession({ ...sess, gameData: d });
+    restorePlayerScreen(d, alreadyVoted);
+});
 
+// ✅ دالة مشتركة لعرض شاشة اللاعب (أول مرة أو reconnect)
+function restorePlayerScreen(d, alreadyVoted) {
     show('playerPanel');
     document.getElementById('playerContent').innerHTML = `
         <div class="card">
@@ -261,8 +282,16 @@ socket.on('gameData', (d) => {
             </div>
             <h1 style="color:${d.role.includes('🔪') ? '#ff4d4d' : '#00ffcc'}">${d.role}</h1>
         </div>`;
-    renderVoteButtons(d.allCharNames);
-});
+
+    if (alreadyVoted) {
+        // ✅ لو صوّت قبل كده — ماتبينش أزرار التصويت تاني
+        document.getElementById('vUI').style.display = 'none';
+        document.getElementById('vBtns').innerHTML = '';
+        showMsg('✅ صوتك اتسجل خلاص في هذه الجولة');
+    } else {
+        renderVoteButtons(d.allCharNames);
+    }
+}
 
 // ════════════════════════════════════════════════
 //  بيانات البوس
@@ -289,6 +318,7 @@ function renderVoteButtons(chars) {
         btn.innerText = char;
         btn.onclick = () => {
             socket.emit('castVote', { roomCode: myCode, votedForChar: char });
+            const sess = loadSession(); saveSession({...sess, hasVoted: true});
             document.getElementById('vUI').style.display = 'none';
             showMsg("✅ تم إرسال صوتك!");
         };
@@ -325,7 +355,11 @@ socket.on('executionResult', (d) => {
 });
 
 socket.on('nextRound', (aliveChars) => {
+    // ✅ جولة جديدة — نمسح الـ hasVoted عشان يقدر يصوت تاني
+    const sess = loadSession(); saveSession({...sess, hasVoted: false});
     renderVoteButtons(aliveChars);
+    // تحديث allCharNames في gameData المحفوظة
+    if (sess.gameData) saveSession({...sess, gameData: {...sess.gameData, allCharNames: aliveChars}, hasVoted: false});
 });
 
 function closeRoom() {

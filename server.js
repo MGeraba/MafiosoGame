@@ -192,6 +192,33 @@ io.on('connection', (socket) => {
 
     socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
 
+    // ── Reconnect اللاعب (بيبعت اسمه بس، بدون ما يكون في الـ home screen) ──
+    socket.on('playerReconnect', (data) => {
+        const room = rooms[data.roomCode];
+        if (!room) { socket.emit('error', 'الغرفة انتهت'); return; }
+
+        const existing = room.players.find(p => p.name === data.playerName);
+        if (existing) {
+            existing.id = socket.id;
+            socket.join(data.roomCode);
+            // لو اللعبة بدأت، ابعتله بياناته تاني عشان يستقبل أي events جديدة
+            if (room.started && existing.charName) {
+                const allChars = room.players.filter(p => p.alive).map(p => p.charName);
+                socket.emit('gameData', {
+                    role: existing.role,
+                    story: room.scenario.story,
+                    charName: existing.charName,
+                    charSecret: existing.secret,
+                    allCharNames: allChars
+                });
+            } else if (!room.started) {
+                socket.emit('joinedSuccess', { reconnected: true });
+                io.to(room.boss).emit('updatePlayers', room.players);
+            }
+            console.log(`لاعب ${data.playerName} reconnected للغرفة ${data.roomCode}`);
+        }
+    });
+
     // ── Panic Mode ───────────────────────────────────────────────────────────
     socket.on('triggerPanic', (roomCode) => {
         io.to(roomCode).emit('panicAction');
