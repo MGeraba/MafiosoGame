@@ -7,7 +7,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; margin: 0; padding: 10px; overflow-x: hidden; }
-        .card { background: #151515; border: 1px solid #d4af37; padding: 15px; border-radius: 12px; margin: 10px auto; max-width: 500px; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1); }
+        .card { background: #151515; border: 1px solid #d4af37; padding: 15px; border-radius: 12px; margin: 10px auto; max-width: 500px; box-shadow: 0 4px 15px rgba(212,175,55,0.1); }
         button { background: #d4af37; color: #000; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; width: 90%; font-size: 16px; transition: 0.2s; }
         button:active { transform: scale(0.95); background: #ffdf00; }
         input, textarea { background: #222; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; width: 90%; margin: 8px 0; font-size: 16px; box-sizing: border-box; }
@@ -16,196 +16,358 @@
         .loader { border: 4px solid #333; border-top: 4px solid #d4af37; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .panic-mode { animation: shake 0.3s infinite; background: #400 !important; }
-        @keyframes shake { 0% { transform: translate(1px, 1px); } 50% { transform: translate(-1px, -1px); } 100% { transform: translate(1px, 1px); } }
+        @keyframes shake { 0%,100% { transform: translate(1px,1px); } 50% { transform: translate(-1px,-1px); } }
+
+        /* ✅ شريط الاتصال */
+        #conn-bar { position: fixed; top: 0; left: 0; right: 0; padding: 6px; font-size: 13px; text-align: center; z-index: 999; display: none; }
+        #conn-bar.offline { background: #c0392b; display: block; }
+        #conn-bar.online  { background: #27ae60; display: block; animation: fadeOut 2s 1s forwards; }
+        @keyframes fadeOut { to { opacity: 0; display: none; } }
     </style>
 </head>
 <body>
 
-    <div id="home">
-        <h1 style="color: #d4af37; letter-spacing: 2px;">🕵️‍♂️ MAFIOSO AI</h1>
+<!-- ✅ شريط حالة الاتصال -->
+<div id="conn-bar">جاري إعادة الاتصال...</div>
+
+<div id="home">
+    <h1 style="color:#d4af37;letter-spacing:2px;margin-top:30px;">🕵️‍♂️ MAFIOSO AI</h1>
+    <div class="card">
+        <button onclick="createRoom()">إنشاء غرفة (أنا البوس 👑)</button>
+        <div style="margin:20px 0;border-top:1px solid #333;"></div>
+        <input type="text" id="playerName" placeholder="اكتب اسمك الحقيقي">
+        <input type="text" id="roomCodeInput" placeholder="كود الغرفة">
+        <button onclick="joinRoom()" style="background:#333;color:white;">انضمام كلاعب 👤</button>
+    </div>
+</div>
+
+<div id="waitingScreen">
+    <div class="card" style="margin-top:40px;">
+        <div class="loader"></div>
+        <h2 style="color:#d4af37;">تم الانضمام! ✅</h2>
+        <p>أنت الآن داخل الغرفة.. انتظر البوس يبدأ الجيم.</p>
+        <p id="waiting-name" style="color:#00ffcc;font-weight:bold;font-size:1.1em;"></p>
+        <p style="font-size:0.8em;color:#666;">(يرجى عدم إغلاق الصفحة)</p>
+    </div>
+</div>
+
+<div id="bossPanel">
+    <h2 id="roomDisplay" style="color:gold;margin:10px 0 5px;"></h2>
+    <div id="setup">
         <div class="card">
-            <button onclick="createRoom()">إنشاء غرفة (أنا البوس 👑)</button>
-            <div style="margin: 20px 0; border-top: 1px solid #333;"></div>
-            <input type="text" id="playerName" placeholder="اكتب اسمك الحقيقي">
-            <input type="text" id="roomCodeInput" placeholder="كود الغرفة">
-            <button onclick="joinRoom()" style="background: #333; color: white;">انضمام كلاعب 👤</button>
+            <h3>تجهيز الجولة</h3>
+            <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
+            <textarea id="tricks" placeholder="تريكات القصة (مثلاً: القاتل ببيجامة خضراء)"></textarea>
+            <div id="pListContainer" style="margin:15px 0;">
+                <p style="color:#888;font-size:0.9em;">اللاعبون المتصلون:</p>
+                <div id="pList">انتظار دخول اللاعبين...</div>
+            </div>
+            <p id="player-count" style="color:#888;font-size:0.85em;"></p>
+            <button id="startBtn" onclick="startGame()" style="background:#28a745;color:white;display:none;">ابدأ الجيم 🚀</button>
+            <button onclick="closeRoom()" style="background:#444;color:white;">إلغاء ❌</button>
         </div>
     </div>
 
-    <div id="waitingScreen">
+    <div id="bossInGame" style="display:none;">
         <div class="card">
-            <div class="loader"></div>
-            <h2 style="color: #d4af37;">تم الانضمام! ✅</h2>
-            <p>أنت الآن داخل الغرفة.. انتظر البوس يبدأ الجيم.</p>
-            <p style="font-size: 0.8em; color: #666;">(يرجى عدم إغلاق الصفحة)</p>
+            <p id="bossStoryDisplay" style="text-align:right;line-height:1.6;font-size:1.1em;"></p>
+            <button onclick="socket.emit('requestPhysicalClue', myCode)" style="background:#17a2b8;color:white;">إظهار دليل (Hint) 🔍</button>
+            <button onclick="socket.emit('triggerPanic', myCode)" style="background:#dc3545;color:white;">PANIC MODE 🚨</button>
         </div>
+        <div class="card">
+            <h4 style="color:#00ffcc;">كشف الأدوار الحقيقية:</h4>
+            <div id="bossSecrets" style="text-align:right;font-size:0.9em;"></div>
+        </div>
+        <div class="card">
+            <h4>📊 نتائج التصويت:</h4>
+            <div id="vStats">لا يوجد أصوات حتى الآن</div>
+            <button onclick="confirmExecution()" style="background:red;color:white;margin-top:15px;">تثبيت الإعدام 💀</button>
+        </div>
+        <button onclick="closeRoom()" style="background:#222;color:white;width:50%;">إنهاء الجيم ❌</button>
     </div>
+</div>
 
-    <div id="bossPanel">
-        <h2 id="roomDisplay" style="color: gold; margin-bottom: 5px;"></h2>
-        <div id="setup">
-            <div class="card">
-                <h3>تجهيز الجولة</h3>
-                <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
-                <textarea id="tricks" placeholder="تريكات القصة (مثلاً: القاتل ببيجامة خضراء)"></textarea>
-                <div id="pListContainer" style="margin: 15px 0;">
-                    <p style="color: #888; font-size: 0.9em;">اللاعبون المتصلون:</p>
-                    <div id="pList">انتظار دخول اللاعبين...</div>
-                </div>
-                <button id="startBtn" onclick="startGame()" style="background: #28a745; color: white; display: none;">ابدأ الجيم 🚀</button>
-                <button onclick="closeRoom()" style="background: #444; color: white;">إلغاء ❌</button>
-            </div>
-        </div>
-
-        <div id="bossInGame" style="display:none;">
-            <div class="card">
-                <p id="bossStoryDisplay" style="text-align: right; line-height: 1.6; font-size: 1.1em;"></p>
-                <button onclick="socket.emit('requestPhysicalClue', myCode)" style="background: #17a2b8; color: white;">إظهار دليل (Hint) 🔍</button>
-                <button onclick="socket.emit('triggerPanic', myCode)" style="background: #dc3545; color: white;">PANIC MODE 🚨</button>
-            </div>
-            <div class="card">
-                <h4 style="color: #00ffcc;">كشف الأدوار الحقيقية:</h4>
-                <div id="bossSecrets" style="text-align: right; font-size: 0.9em;"></div>
-            </div>
-            <div class="card">
-                <h4>📊 نتائج التصويت:</h4>
-                <div id="vStats">لا يوجد أصوات حتى الآن</div>
-                <button onclick="confirmExecution()" style="background: red; color: white; margin-top: 15px;">تثبيت الإعدام 💀</button>
-            </div>
-            <button onclick="closeRoom()" style="background: #222; color: white; width: 50%;">إنهاء الجيم ❌</button>
-        </div>
+<div id="playerPanel">
+    <div id="playerContent"></div>
+    <div id="vUI" style="display:none;" class="card">
+        <h3>صوّت ضد القاتل المشتبه به:</h3>
+        <div id="vBtns"></div>
     </div>
+</div>
 
-    <div id="playerPanel">
-        <div id="playerContent"></div>
-        <div id="vUI" style="display:none;" class="card">
-            <h3>صوّت ضد القاتل المشتبه به:</h3>
-            <div id="vBtns"></div>
-        </div>
-    </div>
+<script>
+// ════════════════════════════════════════════════
+//  إعداد Socket مع reconnection تلقائي
+// ════════════════════════════════════════════════
+const socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,   // ✅ يحاول للأبد
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000
+});
 
-    <script>
-        const socket = io();
-        let myCode = '';
+let myCode   = '';
+let myName   = '';
+let isBoss   = false;
+// ✅ نحفظ بيانات الجلسة في localStorage عشان نرجعها بعد قطع الاتصال
+function saveSession(data) { try { localStorage.setItem('mafioso_session', JSON.stringify(data)); } catch(e){} }
+function loadSession()     { try { return JSON.parse(localStorage.getItem('mafioso_session')||'{}'); } catch(e){ return {}; } }
+function clearSession()    { try { localStorage.removeItem('mafioso_session'); } catch(e){} }
 
-        // --- الأساسيات ---
-        function createRoom() { socket.emit('createRoom'); }
-        
-        socket.on('roomCreated', (c) => { 
-            myCode = c; 
-            document.getElementById('home').style.display='none'; 
-            document.getElementById('bossPanel').style.display='block'; 
-            document.getElementById('roomDisplay').innerText = "كود الغرفة: " + c;
-        });
+// ════════════════════════════════════════════════
+//  حالة الاتصال
+// ════════════════════════════════════════════════
+const connBar = document.getElementById('conn-bar');
 
-        function joinRoom() {
-            const n = document.getElementById('playerName').value;
-            const c = document.getElementById('roomCodeInput').value;
-            if(!n || !c) return alert("اكتب اسمك وكود الغرفة!");
-            myCode = c;
-            socket.emit('joinRoom', { roomCode: c, playerName: n });
+socket.on('disconnect', () => {
+    connBar.textContent = '⚠️ انقطع الاتصال — جاري إعادة الاتصال...';
+    connBar.className = 'offline';
+});
+
+// ✅ لما يتصل تاني، نحاول نرجع للغرفة
+socket.on('connect', () => {
+    connBar.textContent = '✅ رجع الاتصال!';
+    connBar.className = 'online';
+
+    const sess = loadSession();
+    if (!sess.code) return;
+
+    myCode = sess.code;
+    myName = sess.name;
+    isBoss = sess.isBoss;
+
+    if (isBoss) {
+        // ✅ البوس يتحقق ويرجع للغرفة
+        socket.emit('bossReconnect', { roomCode: sess.code, bossToken: sess.bossToken });
+    } else {
+        // ✅ اللاعب يتحقق ويرجع للغرفة بنفس اسمه
+        socket.emit('joinRoom', { roomCode: sess.code, playerName: sess.name });
+    }
+});
+
+// ════════════════════════════════════════════════
+//  البوس — إنشاء غرفة
+// ════════════════════════════════════════════════
+function createRoom() {
+    isBoss = true;
+    socket.emit('createRoom');
+}
+
+socket.on('roomCreated', (c) => {
+    myCode = c;
+    saveSession({ code: c, name: 'Boss', isBoss: true, bossToken: socket.id });
+    show('bossPanel');
+    document.getElementById('roomDisplay').innerText = "كود الغرفة: " + c;
+});
+
+// ✅ البوس رجع بعد انقطاع
+socket.on('bossReconnected', (data) => {
+    show('bossPanel');
+    document.getElementById('roomDisplay').innerText = "كود الغرفة: " + myCode;
+    if (data.started) {
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('bossInGame').style.display = 'block';
+        if (data.scenario) {
+            document.getElementById('bossStoryDisplay').innerText = "📖 القصة: " + data.scenario.story;
         }
-
-        socket.on('joinedSuccess', () => { 
-            document.getElementById('home').style.display='none'; 
-            document.getElementById('waitingScreen').style.display='block'; 
-        });
-
-        // تحديث القائمة للبوس
-        socket.on('updatePlayers', (ps) => { 
-            const list = document.getElementById('pList');
-            if(list) {
-                list.innerHTML = ps.map(p => `<span class="player-tag">👤 ${p.name}</span>`).join('');
-                if(ps.length > 0) document.getElementById('startBtn').style.display = 'block';
-            }
-        });
-
-        // --- الجيم ---
-        function startGame() {
-            document.getElementById('startBtn').innerText = "جاري التأليف... انتظر";
-            document.getElementById('startBtn').disabled = true;
-            socket.emit('startGame', { 
-                roomCode: myCode, 
-                crimeType: document.getElementById('crimeType').value, 
-                tricks: document.getElementById('tricks').value 
-            });
-        }
-
-        socket.on('gameData', (d) => {
-            document.getElementById('waitingScreen').style.display='none';
-            document.getElementById('playerPanel').style.display='block';
-            document.getElementById('playerContent').innerHTML = `
-                <div class="card">
-                    <h2 style="color:gold;">${d.charName}</h2>
-                    <p style="text-align:right; font-size:1.1em;">📖 ${d.story}</p>
-                    <div style="background:#222; padding:10px; border-radius:8px; margin:10px 0;">
-                        <small style="color:#888;">سرك:</small>
-                        <p style="margin:5px 0;">${d.charSecret}</p>
-                    </div>
-                    <h1 style="color:${d.role.includes('🔪') ? '#ff4d4d' : '#00ffcc'}">${d.role}</h1>
-                </div>`;
-            renderVoteButtons(d.allCharNames);
-        });
-
-        socket.on('bossData', (d) => {
-            document.getElementById('setup').style.display='none';
-            document.getElementById('bossInGame').style.display='block';
-            document.getElementById('bossStoryDisplay').innerText = "📖 القصة: " + d.story;
-            document.getElementById('bossSecrets').innerHTML = d.players.map(p=>
+        if (data.players) {
+            document.getElementById('bossSecrets').innerHTML = data.players.map(p =>
                 `<p><b>${p.name}</b> ➡️ (${p.charName}) - [${p.role}]</p>`
             ).join('');
-        });
-
-        function renderVoteButtons(chars) {
-            const container = document.getElementById('vBtns');
-            container.innerHTML = "";
-            document.getElementById('vUI').style.display = 'block';
-            chars.forEach(char => {
-                const btn = document.createElement('button');
-                btn.style.width = "45%"; btn.innerText = char;
-                btn.onclick = () => {
-                    socket.emit('castVote', { roomCode: myCode, votedForChar: char });
-                    document.getElementById('vUI').style.display = 'none';
-                    alert("تم إرسال صوتك!");
-                };
-                container.appendChild(btn);
-            });
         }
-
-        socket.on('voteResultUpdate', (d) => {
-            let s = ""; for(let k in d.details) s += `<p>${k}: ${d.details[k]} أصوات</p>`;
-            document.getElementById('vStats').innerHTML = s;
-        });
-
-        socket.on('receiveClue', (clue) => {
-            alert("🔍 دليل جديد من البوس: " + clue);
-        });
-
-        socket.on('panicAction', () => {
-            document.body.classList.add('panic-mode');
-            setTimeout(() => document.body.classList.remove('panic-mode'), 4000);
-        });
-
-        function confirmExecution() {
-            if(confirm("هل أنت متأكد من قرار الإعدام بناءً على الأصوات؟")) {
-                socket.emit('executePlayer', myCode);
-            }
+    } else {
+        // لسه في اللوبي — نعرض اللاعبين
+        if (data.players && data.players.length > 0) {
+            updatePlayerList(data.players);
         }
+    }
+});
 
-        socket.on('executionResult', (d) => {
-            alert(d.isMafia ? `✅ مبروك! المافيا (${d.charName}) راح ورا الشمس. متبقي ${d.remaining} مافيا.` 
-                           : `❌ يا نهار أبيض! أعدمتم شخص بريء (${d.charName}). القاتل لسه حر!`);
-        });
+// ════════════════════════════════════════════════
+//  اللاعب — الانضمام
+// ════════════════════════════════════════════════
+function joinRoom() {
+    const n = document.getElementById('playerName').value.trim();
+    const c = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+    if (!n || !c) { alert("اكتب اسمك وكود الغرفة!"); return; }
+    myCode = c;
+    myName = n;
+    saveSession({ code: c, name: n, isBoss: false });
+    socket.emit('joinRoom', { roomCode: c, playerName: n });
+}
 
-        socket.on('nextRound', (aliveChars) => {
-            renderVoteButtons(aliveChars);
-        });
+socket.on('joinedSuccess', (data) => {
+    if (!data?.reconnected) {
+        // ✅ انضمام جديد — نبيّن شاشة الانتظار
+        show('waitingScreen');
+        document.getElementById('waiting-name').textContent = 'مرحباً، ' + myName + ' 👋';
+    }
+    // لو reconnect والعبة بدأت، هيجيه gameData تاني من السيرفر
+});
 
-        function closeRoom() {
-            if(confirm("هل تريد إنهاء اللعبة وإغلاق الغرفة؟")) socket.emit('closeRoom', myCode);
-        }
+// ════════════════════════════════════════════════
+//  تحديث قائمة اللاعبين (البوس)
+// ════════════════════════════════════════════════
+function updatePlayerList(players) {
+    const list = document.getElementById('pList');
+    const countEl = document.getElementById('player-count');
+    if (!list) return;
+    if (players.length === 0) {
+        list.innerHTML = 'انتظار دخول اللاعبين...';
+        countEl.textContent = '';
+        document.getElementById('startBtn').style.display = 'none';
+        return;
+    }
+    list.innerHTML = players.map(p =>
+        `<span class="player-tag">👤 ${p.name}</span>`
+    ).join('');
+    countEl.textContent = `✅ ${players.length} لاعب جاهز`;
+    document.getElementById('startBtn').style.display = 'block';
+}
 
-        socket.on('gameOver', (m) => { alert(m); location.reload(); });
-    </script>
+socket.on('updatePlayers', (ps) => updatePlayerList(ps));
+
+// ════════════════════════════════════════════════
+//  بدء اللعبة
+// ════════════════════════════════════════════════
+function startGame() {
+    const btn = document.getElementById('startBtn');
+    btn.innerText = "جاري التأليف... انتظر ✨";
+    btn.disabled = true;
+    socket.emit('startGame', {
+        roomCode: myCode,
+        crimeType: document.getElementById('crimeType').value,
+        tricks: document.getElementById('tricks').value
+    });
+}
+
+// ════════════════════════════════════════════════
+//  بيانات اللاعب
+// ════════════════════════════════════════════════
+socket.on('gameData', (d) => {
+    // نحفظ بيانات اللاعب محليًا للـ reconnect
+    const sess = loadSession();
+    saveSession({ ...sess, gameData: d });
+
+    show('playerPanel');
+    document.getElementById('playerContent').innerHTML = `
+        <div class="card">
+            <h2 style="color:gold;">${d.charName}</h2>
+            <p style="text-align:right;font-size:1.1em;line-height:1.6;">📖 ${d.story}</p>
+            <div style="background:#222;padding:10px;border-radius:8px;margin:10px 0;">
+                <small style="color:#888;">سرك الخاص:</small>
+                <p style="margin:5px 0;color:#00ffcc;">${d.charSecret}</p>
+            </div>
+            <h1 style="color:${d.role.includes('🔪') ? '#ff4d4d' : '#00ffcc'}">${d.role}</h1>
+        </div>`;
+    renderVoteButtons(d.allCharNames);
+});
+
+// ════════════════════════════════════════════════
+//  بيانات البوس
+// ════════════════════════════════════════════════
+socket.on('bossData', (d) => {
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('bossInGame').style.display = 'block';
+    document.getElementById('bossStoryDisplay').innerText = "📖 القصة: " + d.story;
+    document.getElementById('bossSecrets').innerHTML = d.players.map(p =>
+        `<p><b>${p.name}</b> ➡️ (${p.charName}) - [${p.role}]</p>`
+    ).join('');
+});
+
+// ════════════════════════════════════════════════
+//  التصويت
+// ════════════════════════════════════════════════
+function renderVoteButtons(chars) {
+    const container = document.getElementById('vBtns');
+    container.innerHTML = "";
+    document.getElementById('vUI').style.display = 'block';
+    chars.forEach(char => {
+        const btn = document.createElement('button');
+        btn.style.width = "45%";
+        btn.innerText = char;
+        btn.onclick = () => {
+            socket.emit('castVote', { roomCode: myCode, votedForChar: char });
+            document.getElementById('vUI').style.display = 'none';
+            showMsg("✅ تم إرسال صوتك!");
+        };
+        container.appendChild(btn);
+    });
+}
+
+socket.on('voteResultUpdate', (d) => {
+    let s = "";
+    for (let k in d.details) s += `<p>${k}: <b style="color:#d4af37">${d.details[k]}</b> أصوات</p>`;
+    s += `<p style="color:#888;font-size:0.85em;">إجمالي الأصوات: ${d.totalVotes}</p>`;
+    document.getElementById('vStats').innerHTML = s;
+});
+
+socket.on('receiveClue', (clue) => {
+    showMsg("🔍 دليل جديد: " + clue, 6000);
+});
+
+socket.on('panicAction', () => {
+    document.body.classList.add('panic-mode');
+    setTimeout(() => document.body.classList.remove('panic-mode'), 4000);
+});
+
+function confirmExecution() {
+    if (confirm("هل أنت متأكد من قرار الإعدام بناءً على الأصوات؟")) {
+        socket.emit('executePlayer', myCode);
+    }
+}
+
+socket.on('executionResult', (d) => {
+    showMsg(d.isMafia
+        ? `✅ مبروك! المافيا (${d.charName}) راح ورا الشمس. متبقي ${d.remaining} مافيا.`
+        : `❌ يا نهار أبيض! أعدمتم بريء (${d.charName}). القاتل لسه حر!`, 5000);
+});
+
+socket.on('nextRound', (aliveChars) => {
+    renderVoteButtons(aliveChars);
+});
+
+function closeRoom() {
+    if (confirm("هل تريد إنهاء اللعبة وإغلاق الغرفة؟")) {
+        socket.emit('closeRoom', myCode);
+    }
+}
+
+socket.on('gameOver', (m) => {
+    clearSession();
+    alert(m);
+    location.reload();
+});
+
+socket.on('error', (msg) => {
+    alert('خطأ: ' + msg);
+});
+
+// ════════════════════════════════════════════════
+//  Helpers
+// ════════════════════════════════════════════════
+function show(id) {
+    ['home','waitingScreen','bossPanel','playerPanel'].forEach(s => {
+        document.getElementById(s).style.display = 'none';
+    });
+    document.getElementById(id).style.display = 'block';
+}
+
+// Toast بدل alert
+function showMsg(msg, duration = 3500) {
+    let t = document.getElementById('toast-msg');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'toast-msg';
+        t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;border:1px solid #d4af37;color:#fff;padding:12px 20px;border-radius:10px;z-index:9999;max-width:90%;text-align:center;font-size:14px;';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.display = 'block';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.display = 'none'; }, duration);
+}
+</script>
 </body>
 </html>
