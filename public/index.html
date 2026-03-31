@@ -3,35 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mafioso AI 2.5 - QR Edition</title>
+    <title>Mafioso AI 2.5 - Ultimate Edition</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    
     <style>
         body { background: #0a0a0a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; padding: 10px; transition: 0.3s; }
-        .card { background: #151515; border: 1px solid #d4af37; padding: 15px; border-radius: 12px; margin: 10px auto; max-width: 500px; box-shadow: 0 4px 15px rgba(212,175,55,0.1); }
-        button { background: #d4af37; color: #000; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; width: 90%; font-size: 16px; }
-        input, textarea { background: #222; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; width: 90%; margin: 8px 0; font-size: 16px; }
-        
-        /* تصميم الـ QR */
-        #qrcode { background: white; padding: 10px; display: inline-block; border-radius: 8px; margin: 15px auto; }
-        #qrcode img { display: block; }
-
+        .card { background: #151515; border: 1px solid #d4af37; padding: 15px; border-radius: 12px; margin: 10px auto; max-width: 500px; }
+        button { background: #d4af37; color: #000; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; width: 90%; }
+        input, textarea { background: #222; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; width: 90%; margin: 8px 0; }
+        #qrcode { background: white; padding: 10px; display: inline-block; border-radius: 8px; margin: 10px auto; }
         .panic-active { background: #500 !important; animation: shake 0.2s infinite; }
-        @keyframes shake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } }
+        @keyframes shake { 0% { transform: translate(3px, 3px); } 50% { transform: translate(-3px, -3px); } }
         #bossPanel, #playerPanel, #waitingScreen { display: none; }
-        .clue-item { background: #222; border-right: 4px solid #00ffcc; padding: 10px; margin: 5px 0; text-align: right; font-size: 0.9em; border-radius: 4px; }
-        .player-tag { display: inline-block; background: #333; padding: 5px 12px; border-radius: 20px; margin: 3px; color: #00ffcc; font-size: 14px; border: 1px solid #00ffcc; }
+        .clue-item { background: #222; border-right: 4px solid #00ffcc; padding: 10px; margin: 5px 0; text-align: right; }
     </style>
 </head>
 <body>
 
+    <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/spaceship_alarm.ogg" preload="auto"></audio>
+
     <div id="home">
-        <h1 style="color:gold; letter-spacing: 2px;">🕵️‍♂️ MAFIOSO AI 2.5</h1>
+        <h1 style="color:gold;">🕵️‍♂️ MAFIOSO AI 2.5</h1>
         <div class="card">
             <button onclick="createRoom()">إنشاء غرفة (البوس 👑)</button>
-            <div style="margin:20px 0; border-top: 1px solid #333;"></div>
-            <input type="text" id="playerName" placeholder="اكتب اسمك الحقيقي">
+            <input type="text" id="playerName" placeholder="اكتب اسمك">
             <input type="text" id="roomCodeInput" placeholder="كود الغرفة">
             <button onclick="joinRoom()" style="background:#333; color:white;">دخول كلاعب 👤</button>
         </div>
@@ -39,37 +34,27 @@
 
     <div id="waitingScreen" class="card">
         <h2 style="color:gold;">تم الانضمام! ✅</h2>
-        <p>خليك جاهز، البوس بيوزع الشخصيات دلوقتي..</p>
+        <p>الرجاء الانتظار حتى يبدأ البوس اللعبة...</p>
     </div>
 
     <div id="bossPanel">
-        <div class="card">
-            <h2 id="roomDisplay" style="color:gold; margin:0;"></h2>
-            <div id="qrcode"></div> <p style="font-size: 0.8em; color: #888;">خليهم يعملوا سكان عشان يدخلوا فوراً</p>
+        <h2 id="roomDisplay" style="color:gold;"></h2>
+        <div id="qrcode"></div>
+        <div id="setup" class="card">
+            <input type="text" id="crimeType" placeholder="الجريمة">
+            <textarea id="tricks" placeholder="التريكات"></textarea>
+            <button id="startBtn" onclick="startGame()" style="display:none; background:green; color:white;">ابدأ الجيم 🚀</button>
         </div>
-
-        <div id="setup">
-            <div class="card">
-                <input type="text" id="crimeType" placeholder="نوع الجريمة (اختياري)">
-                <textarea id="tricks" placeholder="تريكات القصة (اختياري)"></textarea>
-                <div id="pListContainer" style="margin: 15px 0;">
-                    <p style="color:#888;">اللاعبين المتصلين:</p>
-                    <div id="pList">انتظار اللاعبين...</div>
-                </div>
-                <button id="startBtn" onclick="startGame()" style="display:none; background:green; color:white;">ابدأ الجيم 🚀</button>
-            </div>
-        </div>
-
         <div id="bossInGame" style="display:none;">
             <div class="card">
-                <p id="bossStoryDisplay" style="text-align:right; line-height:1.6;"></p>
-                <button onclick="socket.emit('requestPhysicalClue', myCode)" style="background:cyan;">طلب دليل جديد (Hint) 🔍</button>
+                <p id="bossStoryDisplay" style="text-align:right;"></p>
+                <button onclick="socket.emit('requestPhysicalClue', myCode)" style="background:cyan;">طلب تلميح جديد 🔍</button>
                 <button onclick="socket.emit('triggerPanic', myCode)" style="background:red; color:white;">PANIC MODE 🚨</button>
             </div>
-            <div id="cluesList" class="card"><h4>الأدلة المحفوظة:</h4></div>
-            <div id="vStats" class="card"><h4>نتائج التصويت:</h4></div>
-            <button onclick="socket.emit('executePlayer', myCode)" style="background:red; color:white;">تثبيت الإعدام 💀</button>
-            <button onclick="closeRoom()" style="background:#333; color:white; margin-top:20px;">إنهاء الجيم ❌</button>
+            <div id="cluesList" class="card"><h4>الأدلة:</h4></div>
+            <div id="vStats" class="card"><h4>التصويت (لايف):</h4></div>
+            <button onclick="socket.emit('executePlayer', myCode)" style="background:red; color:white;">تنفيذ الإعدام 💀</button>
+            <button onclick="closeRoom()" style="background:#333; color:white;">إنهاء ومسح الجيم ❌</button>
         </div>
     </div>
 
@@ -82,128 +67,104 @@
     </div>
 
     <script>
-        const socket = io();
+        const socket = io({ reconnection: true });
         let myCode = '', myCharName = '';
 
-        // أول ما الصفحة تفتح، نشوف لو في كود في الرابط (Scan QR)
-        window.onload = () => {
-            const params = new URLSearchParams(window.location.search);
-            const codeFromUrl = params.get('join');
-            if (codeFromUrl) {
-                document.getElementById('roomCodeInput').value = codeFromUrl.toUpperCase();
+        // ─── نظام حفظ الجلسة ───
+        function saveSession(data) { localStorage.setItem('mafia_sess', JSON.stringify(data)); }
+        function loadSession() { return JSON.parse(localStorage.getItem('mafia_sess') || '{}'); }
+        function clearSession() { localStorage.removeItem('mafia_sess'); }
+
+        socket.on('connect', () => {
+            const s = loadSession();
+            if(s.code) {
+                myCode = s.code;
+                if(s.isBoss) socket.emit('bossReconnect', { roomCode: s.code, bossToken: socket.id });
+                else socket.emit('joinRoom', { roomCode: s.code, playerName: s.name });
             }
+        });
+
+        window.onload = () => {
+            const codeFromUrl = new URLSearchParams(window.location.search).get('join');
+            if(codeFromUrl) document.getElementById('roomCodeInput').value = codeFromUrl.toUpperCase();
         };
 
         function createRoom() { socket.emit('createRoom'); }
-
         socket.on('roomCreated', c => { 
-            myCode = c; 
-            show('bossPanel'); 
+            myCode = c; saveSession({code: c, isBoss: true}); show('bossPanel');
             document.getElementById('roomDisplay').innerText = "كود الغرفة: " + c;
-            
-            // توليد الـ QR Code
-            // الرابط هيكون عبارة عن لينك الموقع + باراميتر الجوين
-            const joinLink = window.location.origin + "?join=" + c;
-            document.getElementById('qrcode').innerHTML = ""; // مسح القديم
-            new QRCode(document.getElementById("qrcode"), {
-                text: joinLink,
-                width: 150,
-                height: 150,
-                colorDark : "#000000",
-                colorLight : "#ffffff"
-            });
+            new QRCode(document.getElementById("qrcode"), { text: window.location.origin + "?join=" + c, width: 120, height: 120 });
+        });
+
+        socket.on('bossReconnected', d => {
+            show('bossPanel'); document.getElementById('roomDisplay').innerText = "كود الغرفة: " + myCode;
+            if(d.started) {
+                document.getElementById('setup').style.display = 'none';
+                document.getElementById('bossInGame').style.display = 'block';
+                document.getElementById('bossStoryDisplay').innerText = d.scenario.story;
+            }
         });
 
         function joinRoom() {
-            const name = document.getElementById('playerName').value;
+            const n = document.getElementById('playerName').value;
             myCode = document.getElementById('roomCodeInput').value.toUpperCase();
-            if(!name || !myCode) return alert("اكتب اسمك وكود الغرفة!");
-            socket.emit('joinRoom', { roomCode: myCode, playerName: name });
+            saveSession({code: myCode, name: n, isBoss: false});
+            socket.emit('joinRoom', { roomCode: myCode, playerName: n });
         }
 
         socket.on('joinedSuccess', () => show('waitingScreen'));
+        socket.on('updatePlayers', ps => { document.getElementById('startBtn').style.display = ps.length > 0 ? 'block' : 'none'; });
 
-        socket.on('updatePlayers', ps => {
-            document.getElementById('pList').innerHTML = ps.map(p => `<span class="player-tag">👤 ${p.name}</span>`).join('');
-            document.getElementById('startBtn').style.display = ps.length > 0 ? 'block' : 'none';
-        });
-
-        function startGame() {
-            document.getElementById('startBtn').innerText = "جاري تأليف القصة...";
-            socket.emit('startGame', { 
-                roomCode: myCode, 
-                crimeType: document.getElementById('crimeType').value || "جريمة غامضة" 
-            });
-        }
+        function startGame() { socket.emit('startGame', { roomCode: myCode, crimeType: document.getElementById('crimeType').value }); }
 
         socket.on('gameData', d => {
-            myCharName = d.charName;
-            show('playerPanel');
-            document.getElementById('playerContent').innerHTML = `
-                <div class="card">
-                    <h2 style="color:gold;">${d.charName}</h2>
-                    <p style="text-align:right;">📖 ${d.story}</p>
-                    <p style="background:#222; padding:10px; border-radius:5px;">🤫 سرك: ${d.charSecret}</p>
-                    <h1 style="color:${d.role.includes('🔪') ? 'red' : 'cyan'}">${d.role}</h1>
-                </div>`;
-            renderVotes(d.allChars);
+            myCharName = d.charName; show('playerPanel');
+            document.getElementById('playerContent').innerHTML = `<div class="card"><h2>${d.charName}</h2><p>${d.story}</p><h3>${d.role}</h3><p style="color:cyan;">سرك: ${d.charSecret}</p></div>`;
+            renderVotes(d.allCharNames);
         });
 
+        socket.on('bossData', d => {
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('bossInGame').style.display = 'block';
+            document.getElementById('bossStoryDisplay').innerText = d.story;
+        });
+
+        // ─── التصويت ───
         function renderVotes(chars) {
-            const div = document.getElementById('vBtns'); 
-            div.innerHTML = "";
+            const div = document.getElementById('vBtns'); div.innerHTML = "";
             document.getElementById('vUI').style.display = "block";
             chars.forEach(c => {
-                if (c !== myCharName) { // منع التصويت على النفس
-                    const b = document.createElement('button');
-                    b.innerText = c;
-                    b.style.width = "45%";
-                    b.onclick = () => { 
-                        socket.emit('castVote', { roomCode: myCode, votedFor: c }); 
-                        document.getElementById('vUI').style.display = "none";
-                        alert("تم إرسال صوتك!");
-                    };
-                    div.appendChild(b);
-                }
+                const b = document.createElement('button'); b.innerText = c;
+                b.onclick = () => { socket.emit('castVote', { roomCode: myCode, votedFor: c }); document.getElementById('vUI').style.display = "none"; alert("تم التصويت"); };
+                div.appendChild(b);
             });
         }
 
+        socket.on('voteUpdate', counts => {
+            document.getElementById('vStats').innerHTML = "<h4>التصويت (لايف):</h4>" + Object.entries(counts).map(([c, v]) => `<p>${c}: <b>${v}</b> صوت</p>`).join('');
+        });
+
+        socket.on('hideVoting', msg => { document.getElementById('vUI').style.display = "none"; alert(msg); });
+        socket.on('nextRound', chars => { document.getElementById('vStats').innerHTML = "<h4>التصويت:</h4>"; renderVotes(chars); });
+
+        // ─── الهنتات والبانيك مود والنهايات ───
         socket.on('receiveClueBoss', clues => {
-            const div = document.getElementById('cluesList');
-            div.innerHTML = "<h4>الأدلة المحفوظة:</h4>" + clues.map(c => `<div class="clue-item">🔍 ${c}</div>`).join('');
+            document.getElementById('cluesList').innerHTML = "<h4>الأدلة:</h4>" + clues.map(c => `<div class="clue-item">جولة ${c.round}: ${c.text}</div>`).join('');
         });
 
         socket.on('panicAction', () => {
+            document.getElementById('alarmSound').play().catch(e => console.log('Audio blocked by browser'));
             document.body.classList.add('panic-active');
             setTimeout(() => document.body.classList.remove('panic-active'), 5000);
         });
 
-        socket.on('voteUpdate', counts => {
-            let h = "<h4>نتائج التصويت الحالية:</h4>";
-            for(let char in counts) h += `<p>${char}: ${counts[char]} صوت</p>`;
-            document.getElementById('vStats').innerHTML = h;
-        });
+        socket.on('systemMessage', msg => alert(msg));
+        socket.on('executionResult', msg => alert(msg));
+        
+        socket.on('gameOver', m => { clearSession(); alert(m); window.location.href = window.location.origin; });
+        function closeRoom() { socket.emit('closeRoom', myCode); }
 
-        socket.on('executionResult', d => {
-            alert(d.isMafia ? `✅ مبروك! اتمسكت المافيا: ${d.name}` : `❌ للأسف، ${d.name} كان بريء!`);
-        });
-
-        socket.on('nextRound', aliveChars => {
-            renderVotes(aliveChars);
-        });
-
-        socket.on('forceReset', m => { 
-            sessionStorage.clear(); 
-            alert(m); 
-            window.location.href = window.location.origin; // مسح الرابط من الـ QR Parameter
-        });
-
-        function closeRoom() { if(confirm("هل تريد إنهاء الجيم تماماً؟")) socket.emit('closeRoom', myCode); }
-
-        function show(id) {
-            ['home','waitingScreen','bossPanel','playerPanel'].forEach(s => document.getElementById(s).style.display = 'none');
-            document.getElementById(id).style.display = 'block';
-        }
+        function show(id) { ['home','waitingScreen','bossPanel','playerPanel'].forEach(s => document.getElementById(s).style.display = 'none'); document.getElementById(id).style.display = 'block'; }
     </script>
 </body>
 </html>
