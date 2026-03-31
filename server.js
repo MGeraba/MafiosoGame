@@ -11,116 +11,134 @@ app.use(express.static('public'));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
 
-async function AI(prompt){
+async function getAIResponse(prompt) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const res = await model.generateContent(prompt);
-    return res.response.text().replace(/```json|```/g,'').trim();
+    const result = await model.generateContent(prompt);
+    return result.response.text().replace(/```json|```/g, "").trim();
 }
 
 let rooms = {};
 
-io.on('connection',(socket)=>{
+io.on('connection', (socket) => {
 
-socket.on('createRoom',()=>{
-const code=Math.random().toString(36).substring(2,6).toUpperCase();
+socket.on('createRoom', () => {
+    const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
 
-rooms[code]={boss:socket.id,players:[],votes:{},round:1};
+    rooms[roomCode] = { 
+        boss: socket.id, 
+        players: [], 
+        votes: {}, 
+        scenario: null, 
+        round: 1, 
+        started: false,
+        hints: []
+    };
 
-socket.join(code);
-socket.emit('roomCreated',code);
+    socket.join(roomCode);
+    socket.emit('roomCreated', roomCode);
 });
 
-socket.on('joinRoom',(d)=>{
-const r=rooms[d.roomCode];
-if(!r) return;
-
-r.players.push({id:socket.id,name:d.playerName,alive:true,role:"مواطن"});
-
-socket.join(d.roomCode);
-socket.emit('joinedSuccess');
-io.to(r.boss).emit('updatePlayers',r.players);
+socket.on('joinRoom', (data) => {
+    const room = rooms[data.roomCode];
+    if (room) {
+        room.players.push({ id: socket.id, name: data.playerName, role: 'مواطن', alive: true });
+        socket.join(data.roomCode);
+        socket.emit('joinedSuccess');
+        io.to(room.boss).emit('updatePlayers', room.players);
+    }
 });
 
-socket.on('startGame',async (d)=>{
-const r=rooms[d.roomCode];
+socket.on('startGame', async (data) => {
+    const room = rooms[data.roomCode];
 
-const prompt=`
-اكتب قصة مافيا + 6 hints + شخصيات
-JSON فقط:
-{
-"story":"...",
-"hints":["...","...","...","...","...","..."],
-"assignments":[{"name":"...","charName":"...","secret":"..."}]
-}`;
+    const prompt = `
+    اكتب قصة مافيا + 6 hints + شخصيات
+    JSON فقط:
+    {
+    "story": "...",
+    "hints": ["...", "...", "...", "...", "...", "..."],
+    "assignments": [{"name":"...", "charName":"...", "secret":"..."}]
+    }`;
 
-const aiText=await AI(prompt);
-const scenario=JSON.parse(aiText);
+    const response = await getAIResponse(prompt);
+    const scenario = JSON.parse(response);
 
-r.scenario=scenario;
+    room.scenario = scenario;
+    room.hints = scenario.hints || [];
 
-// توزيع مافيا
-const shuffled=[...r.players].sort(()=>Math.random()-0.5);
-shuffled[0].role="مافيوسو";
-shuffled[1].role="مافيوسو";
+    const shuffled = [...room.players].sort(() => Math.random() - 0.5);
+    shuffled[0].role = 'مافيوسو 🔪';
+    shuffled[1].role = 'مافيوسو 🔪';
 
-r.players.forEach(p=>{
-const a=scenario.assignments.find(x=>x.name===p.name);
-p.charName=a?.charName||p.name;
-p.secret=a?.secret||"";
+    room.players.forEach(p => {
+        const assign = scenario.assignments.find(a => a.name === p.name);
 
-io.to(p.id).emit('gameData',{
-role:p.role,
-story:scenario.story,
-charName:p.charName,
-secret:p.secret
-});
-});
+        p.charName = assign?.charName || p.name;
+        p.secret = assign?.secret || "لا يوجد";
 
-io.to(r.boss).emit('bossData',{story:scenario.story,players:r.players});
+        io.to(p.id).emit('gameData', { 
+            role: p.role, 
+            story: scenario.story, 
+            charName: p.charName, 
+            charSecret: p.secret
+        });
+    });
 
-io.to(r.boss).emit('newHint',{hint:scenario.hints[0],round:1});
-});
+    io.to(room.boss).emit('bossData', { story: scenario.story, players: room.players });
 
-socket.on('startVoting',(c)=>{
-io.to(c).emit('startVoting',rooms[c].players);
-});
-
-socket.on('vote',({roomCode,target})=>{
-const r=rooms[roomCode];
-if(!r.votes[target]) r.votes[target]=0;
-r.votes[target]++;
+    io.to(room.boss).emit('newHint', {
+        hint: room.hints[0],
+        round: 1
+    });
 });
 
-socket.on('executeKill',(c)=>{
-const r=rooms[c];
-let max=0,k=null;
-
-for(let p in r.votes){
-if(r.votes[p]>max){max=r.votes[p];k=p;}
-}
-
-const pl=r.players.find(x=>x.name===k);
-if(pl) pl.alive=false;
-
-io.to(c).emit('playerKilled',k);
+socket.on('startVoting', (roomCode) => {
+    const room = rooms[roomCode];
+    room.votes = {};
+    io.to(roomCode).emit('startVoting', room.players);
 });
 
-socket.on('nextRound',(c)=>{
-const r=rooms[c];
-r.round++;
-r.votes={};
-
-io.to(r.boss).emit('newHint',{
-hint:r.scenario.hints[r.round-1],
-round:r.round
-});
+socket.on('vote', ({ roomCode, target }) => {
+    const room = rooms[roomCode];
+    if (!room.votes[target]) room.votes[target] = 0;
+    room.votes[target]++;
 });
 
-socket.on('getHint',async (c)=>{
-const h=await AI("هنت غامض للمافيا");
-io.to(rooms[c].boss).emit('extraHint',h);
+socket.on('executeKill', (roomCode) => {
+    const room = rooms[roomCode];
+
+    let max = 0, killed = null;
+
+    for (let p in room.votes) {
+        if (room.votes[p] > max) {
+            max = room.votes[p];
+            killed = p;
+        }
+    }
+
+    const player = room.players.find(p => p.name === killed);
+    if (player) player.alive = false;
+
+    io.to(roomCode).emit('playerKilled', killed);
+});
+
+socket.on('nextRound', (roomCode) => {
+    const room = rooms[roomCode];
+
+    room.round++;
+    room.votes = {};
+
+    io.to(room.boss).emit('newHint', {
+        hint: room.hints[room.round - 1],
+        round: room.round
+    });
+});
+
+socket.on('getHint', async (roomCode) => {
+    const hint = await getAIResponse(`اعطيني هنت غامض لجريمة مافيا`);
+    io.to(rooms[roomCode].boss).emit('extraHint', hint);
 });
 
 });
 
-server.listen(3000,()=>console.log("🔥 Running"));
+server.listen(3000, () => console.log("🔥 Server Running"));
