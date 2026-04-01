@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mafioso AI 🕵️</title>
+    <title>Mafioso Trial 🕵️</title>
     <script src="/socket.io/socket.io.js"></script>
     <!-- QR Code library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -351,7 +351,7 @@ socket.on('updatePlayers', updatePlayerList);
 // ════════════════════════════════════════════════
 function startGame(){
     const btn=document.getElementById('startBtn');
-    btn.textContent='جاري التأليف... ✨';
+    btn.textContent='جاري التحميل... ✨';
     btn.disabled=true;
     socket.emit('startGame',{
         roomCode:myCode,
@@ -695,6 +695,32 @@ function showToast(msg, dur=3000){
     clearTimeout(t._t);
     t._t=setTimeout(()=>{ t.style.display='none'; }, dur);
 }
+
+// 1. عند انتهاء اللعبة بفوز فريق (المافيا أو المواطنين)
+socket.on('gameOver', (msg) => {
+    alert("🎮 " + msg);
+    // تنظيف الذاكرة تماماً
+    localStorage.removeItem('mafia_sess'); 
+    // العودة للصفحة الرئيسية "نضيفة" بدون كود قديم
+    window.location.href = window.location.origin; 
+});
+
+// 2. في حالة إن "البوس" قفل الغرفة أو السيرفر فصل
+socket.on('roomEnded', () => {
+    alert("⚠️ انتهت الجلسة أو تم إغلاق الغرفة من قبل المضيف.");
+    localStorage.removeItem('mafia_sess');
+    window.location.href = window.location.origin;
+});
+
+// 3. في حالة حدوث خطأ عام (زي كود غلط أو غرفة مش موجودة)
+socket.on('error', (msg) => {
+    alert("❌ خطأ: " + msg);
+    // لو الخطأ متعلق بالغرفة، نضف الذاكرة برضه
+    if(msg.includes("انتهت") || msg.includes("غير موجودة")) {
+        localStorage.removeItem('mafia_sess');
+        window.location.href = window.location.origin;
+    }
+});
 </script>
 <div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:#111; padding:10px; border-top:2px solid #d4af37; z-index:1000; text-align:center;">
         <span style="color:gold; font-weight:bold; margin-left:10px;">🎙️ الصوت:</span>
