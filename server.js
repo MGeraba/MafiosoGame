@@ -456,6 +456,29 @@ io.on('connection', (socket) => {
         console.log('Room closed:', roomCode);
     });
 
+    // ════════════════════════════════════════════════
+    //  نظام المحادثة الصوتية (WebRTC Signaling)
+    // ════════════════════════════════════════════════
+    
+    // لاعب بيدخل غرفة الصوت
+    socket.on('joinVoice', (roomCode) => {
+        socket.join(`${roomCode}-voice`);
+        // بنبلغ باقي الناس اللي في غرفة الصوت إن في حد جديد دخل
+        socket.to(`${roomCode}-voice`).emit('user-joined-voice', socket.id);
+    });
+
+    // تبادل بيانات الاتصال بين اللاعبين
+    socket.on('webrtc-offer', (data) => {
+        io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
+    });
+
+    socket.on('webrtc-answer', (data) => {
+        io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp });
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+        io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
+    });
     socket.on('disconnect', () => {
         // مش بنحذف اللاعب — بنديه فرصة يرجع
     });

@@ -609,6 +609,76 @@ window.addEventListener('load', ()=>{
     // لو فيه session هيتعالج في socket.on('connect')
     else if(!sess._connected) show('screen-home'); // لو لم يتصل قبل كده، ابدأ من الأول
 });
+// 📡 متغيرات المحادثة الصوتية
+let localStream;
+let peers = {};
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+// 1. تشغيل المايك
+async function initVoiceChat() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        document.getElementById('joinVoiceBtn').style.display = 'none';
+        document.getElementById('muteBtn').style.display = 'inline-block';
+        socket.emit('joinVoice', myCode);
+        alert("المايك شغال! اتكلم مع زمايلك");
+    } catch (e) {
+        alert("لازم توافق على استخدام المايك");
+    }
+}
+
+// 2. كتم/فتح الصوت
+function toggleMute() {
+    const track = localStream.getAudioTracks()[0];
+    track.enabled = !track.enabled;
+    document.getElementById('muteBtn').innerText = track.enabled ? "كتم الصوت 🔇" : "فتح الصوت 🔊";
+}
+
+// 3. الربط بين اللاعبين (Signaling)
+socket.on('user-joined-voice', (userId) => {
+    if (localStream) createPeer(userId, true);
+});
+
+socket.on('webrtc-offer', async (data) => {
+    if (!localStream) return;
+    const peer = createPeer(data.sender, false);
+    await peer.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    socket.emit('webrtc-answer', { target: data.sender, sdp: answer });
+});
+
+socket.on('webrtc-answer', (data) => {
+    if (peers[data.sender]) peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp));
+});
+
+socket.on('webrtc-ice-candidate', (data) => {
+    if (peers[data.sender]) peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
+});
+
+function createPeer(targetId, initiator) {
+    const peer = new RTCPeerConnection(rtcConfig);
+    peers[targetId] = peer;
+    localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
+    peer.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
+    peer.ontrack = e => {
+        let aud = document.createElement('audio');
+        aud.autoplay = true;
+        aud.srcObject = e.streams[0];
+        document.getElementById('audioPlayers').appendChild(aud);
+    };
+    if (initiator) {
+        peer.createOffer().then(o => {
+            peer.setLocalDescription(o);
+            socket.emit('webrtc-offer', { target: targetId, sdp: o });
+        });
+    }
+    return peer;
+}
+
+// 4. إظهار شريط الصوت في الوقت المناسب
+socket.on('roomCreated', () => document.getElementById('voiceChatBar').style.display = 'block');
+socket.on('joinedSuccess', () => document.getElementById('voiceChatBar').style.display = 'block');
 
 // ════════════════════════════════════════════════
 //  Helpers
@@ -626,5 +696,10 @@ function showToast(msg, dur=3000){
     t._t=setTimeout(()=>{ t.style.display='none'; }, dur);
 }
 </script>
+<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:#111; padding:10px; border-top:2px solid #d4af37; z-index:1000; text-align:center;">
+        <span style="color:gold; font-weight:bold; margin-left:10px;">🎙️ الصوت:</span>
+        <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; width:auto; padding:8px 20px; font-size:14px;">تشغيل المايك</button>
+        <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; width:auto; padding:8px 20px; font-size:14px;">كتم 🔇</button>
+        <div id="audioPlayers" style="display:none;"></div> </div>
 </body>
 </html>
