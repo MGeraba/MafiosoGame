@@ -34,10 +34,14 @@ async function tryGemini(prompt) {
         const key = GEMINI_KEYS[(geminiIndex + i) % GEMINI_KEYS.length];
         try {
             const genAI = new GoogleGenerativeAI(key);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            // إضافة إجبار الـ JSON هنا
+            const model = genAI.getGenerativeModel({ 
+                model: "gemini-2.5-flash", 
+                generationConfig: { responseMimeType: "application/json" } 
+            });
             const result = await model.generateContent(prompt);
             geminiIndex = (geminiIndex + i + 1) % GEMINI_KEYS.length;
-            return result.response.text().replace(/```json|```/g, "").trim();
+            return result.response.text().trim();
         } catch (e) {
             console.warn(`Gemini key ${i+1} failed: ${e.message}`);
         }
@@ -55,13 +59,15 @@ async function tryGroq(prompt) {
                 body: JSON.stringify({
                     model: "llama-3.3-70b-versatile",
                     messages: [{ role: "user", content: prompt }],
-                    temperature: 0.8, max_tokens: 2000
+                    temperature: 0.8, 
+                    max_tokens: 2000,
+                    response_format: { type: "json_object" } // إضافة إجبار الـ JSON لجروق
                 })
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             groqIndex = (groqIndex + i + 1) % GROQ_KEYS.length;
-            return data.choices[0].message.content.replace(/```json|```/g, "").trim();
+            return data.choices[0].message.content.trim();
         } catch (e) {
             console.warn(`Groq key ${i+1} failed: ${e.message}`);
         }
@@ -271,12 +277,26 @@ io.on('connection', (socket) => {
         }
 
         let scenario;
-        try { scenario = JSON.parse(response); }
-        catch (e) {
+        try { 
+            scenario = JSON.parse(response); 
+        } catch (e) {
             // محاولة استخراج JSON من النص
             const match = response.match(/\{[\s\S]*\}/);
-            if (match) { try { scenario = JSON.parse(match[0]); } catch(e2) { room.started = false; return; } }
-            else { room.started = false; return; }
+            if (match) { 
+                try { 
+                    scenario = JSON.parse(match[0]); 
+                } catch(e2) { 
+                    // إرسال رسالة خطأ بدلاً من الصمت
+                    io.to(room.boss).emit('error', 'الذكاء الاصطناعي كتب قصة بس التنسيق باظ، دوس "ابدأ الجيم" تاني!');
+                    room.started = false; 
+                    return; 
+                } 
+            } else { 
+                // إرسال رسالة خطأ بدلاً من الصمت
+                io.to(room.boss).emit('error', 'الذكاء الاصطناعي ماردش بتنسيق صحيح، دوس "ابدأ الجيم" تاني!');
+                room.started = false; 
+                return; 
+            }
         }
 
         room.scenario = scenario;

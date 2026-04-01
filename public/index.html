@@ -359,7 +359,12 @@ function startGame(){
         tricks:document.getElementById('tricks').value
     });
 }
-
+socket.on('error', (msg) => {
+            alert("⚠️ " + msg);
+            // إرجاع زر البدء لحالته الطبيعية لو كان معلق
+            const startBtn = document.getElementById('startBtn');
+            if(startBtn) startBtn.innerText = "ابدأ الجيم 🚀";
+        });
 // ════════════════════════════════════════════════
 //  Boss Game Data
 // ════════════════════════════════════════════════
