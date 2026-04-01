@@ -162,16 +162,18 @@
 
     <!-- الأدلة والهنتات (ثابتة تتراكم) -->
     <div class="card">
-        <h4 style="color:#7fff7f;margin-bottom:8px">🔍 الأدلة والهنتات</h4>
-        <div id="clues-panel"><p style="color:#555;font-size:.9em">جاري توليد أول دليل...</p></div>
-        <hr class="sep">
-        <button class="btn-blue btn-sm" onclick="requestClue()">طلب دليل جديد 🔍</button>
+    <h4 style="color:#7fff7f;margin-bottom:8px">🔍 لوحة تحكم الأدلة (للبوس)</h4>
+    <div id="clues-panel" style="max-height:200px; overflow-y:auto; margin-bottom:10px;">
+        <p style="color:#555;font-size:0.9em">في انتظار توليد الأدلة...</p>
     </div>
+    <hr class="sep">
+    <button class="btn-blue btn-sm" onclick="requestClue()">توليد دليل جديد من AI 🔍</button>
+</div>
 
     <!-- Plot Twist من Panic -->
-    <div class="card" id="twistCard" style="display:none">
-        <h4 style="color:#ff6b6b;margin-bottom:8px">🌀 Plot Twist!</h4>
-        <div id="twistText" style="text-align:right;color:#ffb3b3;line-height:1.6;font-style:italic"></div>
+    <<div class="card" id="twistCard" style="display:none; border: 2px solid #ff4d4d;">
+    <h4 style="color:#ff4d4d;margin-bottom:8px">⚠️ حدث مفاجئ سري (Plot Twist)</h4>
+    <div id="twistText" style="text-align:right; color:#fff; background:#200; padding:10px; border-radius:8px; margin-bottom:10px;"></div>
     </div>
 
     <!-- التصويت -->
@@ -779,6 +781,17 @@ function showInGameNotification(title, msg) {
     // تختفي لوحدها بعد 10 ثواني لو اللاعب مقفلهاش
     setTimeout(() => { if(notifyDiv) notifyDiv.remove(); }, 10000);
 }
+
+// الكود اللي بيخلي اللاعب يستقبل "النشر" اللي البوس عمله
+socket.on('receiveEvidence', (data) => {
+    // تشغيل الصوت (تأكد إنك ضفت وسوم الـ audio اللي بعتهالك فوق)
+    const sound = data.type === 'evidence' ? document.getElementById('evidencePop') : document.getElementById('twistPop');
+    if(sound) sound.play().catch(e => console.log("الصوت محظور"));
+
+    // إظهار الرسالة للاعب
+    const title = data.type === 'evidence' ? "🔍 دليل جديد!" : "🚨 تحول مفاجئ!";
+    showInGameNotification(title, data.text);
+});
 </script>
 <style>
     /* بنخلي الصفحة تسيب مسافة تحت عشان الشريط ما يغطيش على آخر زراير */
