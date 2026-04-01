@@ -359,26 +359,44 @@ io.on('connection', (socket) => {
         io.to(room.boss).emit('receiveClue', clueObj);
     }
 
-    socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
+    socket.on('receiveClue', (clueObj) => {
+    const panel = document.getElementById('clues-panel');
+    if(panel.querySelector('p')) panel.innerHTML=''; // مسح نص "جاري التوليد"
+    const div = document.createElement('div');
+    div.className = 'clue-item';
+    div.innerHTML = `
+        <div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div>
+        <div class="clue-text">🔍 ${clueObj.text}</div>
+        <button style="background:#28a745; color:white; width:auto; padding:5px 12px; font-size:12px;" 
+                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${clueObj.text.replace(/'/g, "\\'")}', type:'evidence'})">
+            📢 إرسال للاعبين
+        </button>`;
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+});
 
-    // ── Panic Mode — حدث مفاجئ + تأثير بصري ────────────────────
-    socket.on('triggerPanic', async (roomCode) => {
-        const room = rooms[roomCode];
-        // نبعت التأثير البصري/الصوتي فوراً للكل
-        io.to(roomCode).emit('panicAction');
+   // ── Panic Mode — حدث مفاجئ + تأثير بصري (تعديل محمود جربا) ────────────────────
+socket.on('triggerPanic', async (roomCode) => {
+    const room = rooms[roomCode];
+    if (!room) return;
 
-        // نولد Plot Twist من AI للبوس
-        if (room?.scenario) {
-            const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. 
-اللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.
-اكتب حدثاً مفاجئاً (Plot Twist) درامياً ومثيراً يغير مجرى التحقيق تماماً. 
-جملتان أو ثلاث بالعربية، مثيرة ومشوقة.`;
-            const twist = await getAIResponse(prompt);
-            if (twist) {
-                io.to(room.boss).emit('panicTwist', twist);
-            }
+    // 1. نبعت التأثير البصري (الرعشة والصوت) فوراً للكل عشان الكل يقلق
+    io.to(roomCode).emit('panicAction');
+
+    // 2. نولد الـ Plot Twist من AI ونبعته "للبوس فقط" سرّاً
+    if (room.scenario) {
+        const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. 
+        اللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.
+        اكتب حدثاً مفاجئاً (Plot Twist) درامياً ومثيراً يغير مجرى التحقيق تماماً. 
+        جملتان أو ثلاث باللهجة المصرية، مثيرة ومشوقة جداً.`;
+
+        const twist = await getAIResponse(prompt);
+        if (twist) {
+            // بنبعتها للبوس لوحده عشان يظهر عنده زرار "إرسال للكل" اللي ضفناه في الـ HTML
+            io.to(room.boss).emit('panicTwist', twist);
         }
-    });
+    }
+});
 
     // ── التصويت ─────────────────────────────────────────────────
     socket.on('castVote', (data) => {
@@ -482,6 +500,15 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         // مش بنحذف اللاعب — بنديه فرصة يرجع
     });
+// إرسال دليل محدد من البوس للاعبين
+    socket.on('shareEvidence', (data) => {
+        // data تحتوي على النص ونوع الصوت (دليل أو حبكة)
+        io.to(data.roomCode).emit('receiveEvidence', {
+            text: data.text,
+            type: data.type // 'evidence' أو 'twist'
+        });
+    });
+
 });
 
 const PORT = process.env.PORT || 3000;

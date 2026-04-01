@@ -749,6 +749,36 @@ socket.on('error', (msg) => {
         window.location.href = window.location.origin;
     }
 });
+
+socket.on('receiveEvidence', (data) => {
+    // 1. تشغيل الصوت حسب النوع
+    if(data.type === 'evidence') {
+        document.getElementById('evidencePop').play().catch(e => {});
+    } else {
+        document.getElementById('twistPop').play().catch(e => {});
+    }
+
+    // 2. إظهار الدليل في مودال أو تنبيه شيك
+    // أنا هستخدم SweetAlert لو إنت منزله، أو تنبيه عادي
+    const title = data.type === 'evidence' ? "🔍 دليل جديد ظهر!" : "🚨 تحول مفاجئ في الأحداث!";
+    
+    // إظهار الرسالة بأسلوب سينمائي
+    showInGameNotification(title, data.text);
+    
+    // لو عاوز المتحدث الآلي ينطقها برضه (اختياري)
+    if(typeof speakText === 'function') speakText(data.text);
+});
+
+function showInGameNotification(title, msg) {
+    // كود بسيط لإظهار رسالة فوق اللعبة
+    const notifyDiv = document.createElement('div');
+    notifyDiv.style = "position:fixed; top:20%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.9); color:gold; padding:20px; border:2px solid gold; z-index:20000; text-align:center; width:80%; border-radius:15px; box-shadow:0 0 20px gold;";
+    notifyDiv.innerHTML = `<h3>${title}</h3><p style="color:white;">${msg}</p><button onclick="this.parentElement.remove()" style="background:gold; color:black; width:auto; padding:5px 15px;">فهمت</button>`;
+    document.body.appendChild(notifyDiv);
+    
+    // تختفي لوحدها بعد 10 ثواني لو اللاعب مقفلهاش
+    setTimeout(() => { if(notifyDiv) notifyDiv.remove(); }, 10000);
+}
 </script>
 <style>
     /* بنخلي الصفحة تسيب مسافة تحت عشان الشريط ما يغطيش على آخر زراير */
@@ -770,6 +800,9 @@ socket.on('error', (msg) => {
         Dev: <span style="color: gold;">Mahmoud Geraba</span>
     </div>
 </div>
+
+<audio id="evidencePop" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+<audio id="twistPop" src="https://actions.google.com/sounds/v1/horror/ambient_hum_short.ogg" preload="auto"></audio>
 
 </body>
 </html>
