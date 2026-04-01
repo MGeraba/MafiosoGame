@@ -99,7 +99,7 @@
 
 <!-- ══════════════════ HOME ══════════════════ -->
 <div id="screen-home" class="screen">
-    <h1>🕵️‍♂️ MAFIOSO AI</h1>
+    <h1>🕵️‍♂️ MAFIOSO TRIAL</h1>
     <div class="card">
         <button class="btn-green" onclick="createRoom()">إنشاء غرفة — أنا البوس 👑</button>
         <hr class="sep">
@@ -722,10 +722,23 @@ socket.on('error', (msg) => {
     }
 });
 </script>
-<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:#111; padding:10px; border-top:2px solid #d4af37; z-index:1000; text-align:center;">
-        <span style="color:gold; font-weight:bold; margin-left:10px;">🎙️ الصوت:</span>
-        <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; width:auto; padding:8px 20px; font-size:14px;">تشغيل المايك</button>
-        <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; width:auto; padding:8px 20px; font-size:14px;">كتم 🔇</button>
-        <div id="audioPlayers" style="display:none;"></div> </div>
+<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(17, 17, 17, 0.95); padding:15px 10px 30px 10px; border-top:2px solid #d4af37; z-index:9999; text-align:center; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
+    
+    <span style="color:gold; font-weight:bold; margin-left:15px; vertical-align: middle;">🎙️ إدارة الحوار:</span>
+    
+    <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
+        تشغيل المايك
+    </button>
+    
+    <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
+        كتم 🔇
+    </button>
+
+    <div id="audioPlayers" style="display:none;"></div>
+
+    <div style="position: absolute; bottom: 5px; right: 15px; font-size: 11px; color: rgba(212, 175, 55, 0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; pointer-events: none;">
+        Developed by <span style="font-weight: bold; color: gold; text-shadow: 1px 1px 2px black;">Mahmoud Geraba</span>
+    </div>
+</div>
 </body>
 </html>
