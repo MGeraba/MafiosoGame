@@ -19,13 +19,12 @@ const io = new Server(server, {
 // ════════════════════════════════════════════════
 const GEMINI_KEYS = [
     process.env.GEMINI_KEY,
-    process.env.GEMINI_KEY_2,
-    process.env.GEMINI_KEY_3,
+   
 ].filter(Boolean);
 
 const GROQ_KEYS = [
     process.env.GROQ_KEY,
-    process.env.GROQ_KEY_2,
+    
 ].filter(Boolean);
 
 let geminiIndex = 0, groqIndex = 0;
