@@ -386,13 +386,20 @@ function renderBossSecrets(players){
 //  Clues (Boss Only, Persistent)
 // ════════════════════════════════════════════════
 function addClue(clueObj){
-    const panel=document.getElementById('clues-panel');
-    if(panel.querySelector('p')) panel.innerHTML='';
-    const div=document.createElement('div');
-    div.className='clue-item';
-    div.innerHTML=`<div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div><div class="clue-text">🔍 ${clueObj.text}</div>`;
+    const panel = document.getElementById('clues-panel');
+    if(panel.querySelector('p')) panel.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'clue-item';
+    // التعديل هنا: إضافة زرار الإرسال في الـ HTML اللي بيتولد
+    div.innerHTML = `
+        <div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div>
+        <div class="clue-text">🔍 ${clueObj.text}</div>
+        <button style="background:#28a745; color:white; width:auto; padding:5px 12px; font-size:12px; margin-top:5px; border-radius:5px;" 
+                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${clueObj.text.replace(/'/g, "\\'")}', type:'evidence'})">
+            📢 إرسال للاعبين
+        </button>`;
     panel.appendChild(div);
-    panel.scrollTop=panel.scrollHeight;
+    panel.scrollTop = panel.scrollHeight;
 }
 
 socket.on('receiveClue', (clueObj)=>{
@@ -544,12 +551,18 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
-socket.on('panicTwist', (twist)=>{
-    const card=document.getElementById('twistCard');
-    const txt=document.getElementById('twistText');
-    card.style.display='block';
-    txt.textContent=twist;
-    showToast('🌀 Plot Twist تم توليده!', 3000);
+socket.on('panicTwist', (twist) => {
+    const card = document.getElementById('twistCard');
+    const txt = document.getElementById('twistText');
+    card.style.display = 'block';
+    // التعديل هنا: وضع النص والزرار مع بعض
+    txt.innerHTML = `
+        <p>${twist}</p>
+        <button style="background:#dc3545; color:white; width:auto; padding:8px 15px; font-size:13px; margin-top:10px; border-radius:5px; font-weight:bold;" 
+                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${twist.replace(/'/g, "\\'")}', type:'twist'})">
+            📢 نشر الحدث للكل فوراً
+        </button>`;
+    showToast('🌀 الحدث المفاجئ جاهز للإرسال!', 3000);
 });
 
 // ════════════════════════════════════════════════
