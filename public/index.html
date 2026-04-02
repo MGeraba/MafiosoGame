@@ -792,24 +792,7 @@ socket.on('error', (msg) => {
     }
 });
 
-socket.on('receiveEvidence', (data) => {
-    // 1. تشغيل الصوت حسب النوع
-    if(data.type === 'evidence') {
-        document.getElementById('evidencePop').play().catch(e => {});
-    } else {
-        document.getElementById('twistPop').play().catch(e => {});
-    }
 
-    // 2. إظهار الدليل في مودال أو تنبيه شيك
-    // أنا هستخدم SweetAlert لو إنت منزله، أو تنبيه عادي
-    const title = data.type === 'evidence' ? "🔍 دليل جديد ظهر!" : "🚨 تحول مفاجئ في الأحداث!";
-    
-    // إظهار الرسالة بأسلوب سينمائي
-    showInGameNotification(title, data.text);
-    
-    // لو عاوز المتحدث الآلي ينطقها برضه (اختياري)
-    if(typeof speakText === 'function') speakText(data.text);
-});
 
 function showInGameNotification(title, msg) {
     // كود بسيط لإظهار رسالة فوق اللعبة
