@@ -501,12 +501,23 @@ socket.on('triggerPanic', async (roomCode) => {
     });
 // إرسال دليل محدد من البوس للاعبين
     socket.on('shareEvidence', (data) => {
-        // data تحتوي على النص ونوع الصوت (دليل أو حبكة)
-        io.to(data.roomCode).emit('receiveEvidence', {
-            text: data.text,
-            type: data.type // 'evidence' أو 'twist'
-        });
+        // بنأكد إننا بنبعت لكل اللي في الغرفة بما فيهم البوس واللعيبة
+        if (data.roomCode) {
+            io.to(data.roomCode).emit('receiveEvidence', {
+                text: data.text,
+                type: data.type
+            });
+        }
     });
+    socket.on('receiveEvidence', (data) => {
+    // تشغيل صوت التنبيه
+    const soundId = (data.type === 'evidence') ? 'evidencePop' : 'twistPop';
+    const sound = document.getElementById(soundId);
+    if(sound) sound.play().catch(() => {});
+
+    // إظهار التنبيه
+    showInGameNotification(data.type === 'evidence' ? "🔍 دليل جديد" : "🚨 حدث مفاجئ", data.text);
+});
 
 });
 
