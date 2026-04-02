@@ -153,12 +153,27 @@ function broadcastVoteLists(room) {
         isGhost: false
     });
 }
+async function sendClue(roomCode) {
+    const room = rooms[roomCode];
+    if (!room || !room.scenario) return;
 
+    const mafiaChars = room.players.filter(p => p.role.includes('🔪')).map(p => p.charName).join(' و ');
+    const prevClues = room.clues.map(c => c.text).join(' | ');
+
+    const prompt = `في لعبة مافيا مصرية: القصة: ${room.scenario.story}. المافيا: ${mafiaChars}. الأدلة السابقة: ${prevClues}. اكتب دليل مادي غامض يلمح للمافيا في جملة واحدة بالعامية المصرية.`;
+
+    const clue = await getAIResponse(prompt);
+    if (clue) {
+        const clueObj = { text: clue, round: room.round, time: new Date().toLocaleTimeString('ar-EG') };
+        room.clues.push(clueObj);
+        io.to(room.boss).emit('receiveClue', clueObj);
+    }
+}
 // ════════════════════════════════════════════════
 //  Socket Events
 // ════════════════════════════════════════════════
 io.on('connection', (socket) => {
-
+socket.on('requestClue', (roomCode) => { sendClue(roomCode); });
     // ── إنشاء غرفة ──────────────────────────────────────────────
     socket.on('createRoom', () => {
         const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -331,33 +346,7 @@ io.on('connection', (socket) => {
 
         // أول دليل في بداية اللعبة
         await sendClue(data.roomCode);
-    });
-
-    // ── إرسال دليل (للبوس فقط، ثابت) ──────────────────────────
-    async function sendClue(roomCode) {
-        const room = rooms[roomCode];
-        if (!room?.scenario) return;
-        const mafiaChars = room.players.filter(p => p.role.includes('🔪')).map(p => p.charName).join(' و ');
-        const prevClues = room.clues.map(c => c.text).join(' | ');
-        const prompt = `في لعبة المافيا هذه:
-القصة: ${room.scenario.story}
-المافيا (سري): ${mafiaChars}
-الأدلة السابقة: ${prevClues || "لا يوجد"}
-أعطني دليلاً مادياً غامضاً جديداً يلمح لأحد المافيا في الجولة ${room.round} دون أن يكشفه مباشرة. جملة واحدة فقط باللهجة المصرية.`;
-
-        const clue = await getAIResponse(prompt);
-        if (!clue) return;
-
-        const clueObj = {
-            text: clue,
-            round: room.round,
-            time: new Date().toLocaleTimeString('ar-EG')
-        };
-        room.clues.push(clueObj);
-        // الدليل للبوس فقط
-        io.to(room.boss).emit('receiveClue', clueObj);
-    }
-
+    });    
     
 
    // ── Panic Mode — حدث مفاجئ + تأثير بصري (تعديل محمود جربا) ────────────────────
@@ -482,9 +471,7 @@ socket.on('triggerPanic', async (roomCode) => {
     socket.on('webrtc-ice-candidate', (data) => {
         io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
     });
-    socket.on('disconnect', () => {
-        // مش بنحذف اللاعب — بنديه فرصة يرجع
-    });
+    
 // إرسال دليل محدد من البوس للاعبين
     // إرسال دليل محدد من البوس للاعبين (تعديل محمود جرابه)
     socket.on('shareEvidence', (data) => {
@@ -495,7 +482,22 @@ socket.on('triggerPanic', async (roomCode) => {
             });
         }
     });
+// --- استقبال طلب الدليل الجديد من البوس ---
+    socket.on('requestClue', async (roomCode) => {
+        console.log("جاري توليد دليل للغرفة:", roomCode);
+        await sendClue(roomCode); // الدالة دي موجودة عندك بره وتمام
+    });
 
+    // --- استقبال أمر نشر الدليل أو التويست للاعبين ---
+    socket.on('shareEvidence', (data) => {
+        if (data.roomCode) {
+            console.log("نشر دليل للاعبين:", data.type);
+            io.in(data.roomCode).emit('receiveEvidence', {
+                text: data.text,
+                type: data.type
+            });
+        }
+    });
     socket.on('disconnect', () => {
         // مش بنحذف اللاعب — بنديه فرصة يرجع
     });

@@ -167,7 +167,7 @@
         <p style="color:#555;font-size:0.9em">في انتظار توليد الأدلة...</p>
     </div>
     <hr class="sep">
-    <button class="btn-blue btn-sm" onclick="requestClue()">توليد دليل جديد من AI 🔍</button>
+<button class="btn-blue btn-sm" onclick="requestClue()">توليد دليل جديد 🔍</button>
 </div>
 
     <!-- Plot Twist من Panic -->
@@ -564,34 +564,6 @@ socket.on('panicTwist', (twist) => {
     showToast('🌀 Plot Twist جديد جاهز!', 2500);
 });
 // ════════════════════════════════════════════════
-//  استقبال الدليل أو الحدث المبعوت من البوس
-// ════════════════════════════════════════════════
-socket.on('receiveEvidence', (data) => {
-    const isEvidence = data.type === 'evidence';
-    const title = isEvidence ? '🔍 دليل جديد من البوس' : '🌀 حدث مفاجئ!';
-    const color = isEvidence ? '#7fff7f' : '#ff6b6b';
-
-    // إظهار إشعار بارز فوق الشاشة
-    let notif = document.getElementById('evidence-notif');
-    if (!notif) {
-        notif = document.createElement('div');
-        notif.id = 'evidence-notif';
-        notif.style.cssText = `
-            position:fixed; top:50px; left:50%; transform:translateX(-50%);
-            background:#111; border:2px solid ${color}; color:#fff;
-            padding:16px 20px; border-radius:12px; z-index:8500;
-            max-width:90%; text-align:center; font-size:15px;
-            box-shadow: 0 0 20px ${color}44;
-        `;
-        document.body.appendChild(notif);
-    }
-    notif.style.borderColor = color;
-    notif.innerHTML = `<b style="color:${color}">${title}</b><br><br>${data.text}<br><br>
-        <button onclick="document.getElementById('evidence-notif').style.display='none'" 
-                style="width:auto;padding:6px 20px;font-size:13px">حسناً ✓</button>`;
-    notif.style.display = 'block';
-});
-// ════════════════════════════════════════════════
 //  Execution Result
 // ════════════════════════════════════════════════
 function confirmExecution(){
@@ -811,8 +783,24 @@ function showInGameNotification(title, msg) {
     setTimeout(() => { if(notifyDiv) notifyDiv.remove(); }, 10000);
 }
 
-// الكود اللي بيخلي اللاعب يستقبل "النشر" اللي البوس عمله
+// استقبال الدلائل اللي البوس بينشرها (عند اللاعبين)
+socket.on('receiveEvidence', (data) => {
+    // 1. تشغيل صوت التنبيه (تأكد إن الوسوم موجودة في البداية)
+    const soundId = (data.type === 'evidence') ? 'evidencePop' : 'twistPop';
+    const sound = document.getElementById(soundId);
+    if(sound) sound.play().catch(() => console.log("الصوت محظور"));
 
+    // 2. إظهار الإشعار للاعب
+    const title = (data.type === 'evidence') ? "🔍 دليل جديد!" : "🚨 تحول مفاجئ!";
+    showInGameNotification(title, data.text);
+});
+
+// دالة طلب دليل جديد (عشان تربط الزرار بالسيرفر)
+function requestClue() {
+    if(!myCode) return;
+    showToast("جاري طلب دليل من الـ AI...", 2000);
+    socket.emit('requestClue', myCode);
+}
 </script>
 <style>
     /* بنخلي الصفحة تسيب مسافة تحت عشان الشريط ما يغطيش على آخر زراير */
