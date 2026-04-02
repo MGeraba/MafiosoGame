@@ -387,24 +387,23 @@ function renderBossSecrets(players){
 // ════════════════════════════════════════════════
 function addClue(clueObj){
     const panel = document.getElementById('clues-panel');
-    // بنشيل كلمة "جاري التوليد" بس في أول مرة
     if(panel.innerText.includes('جاري') || panel.innerText.includes('انتظار')) panel.innerHTML = '';
     
     const div = document.createElement('div');
     div.className = 'clue-item';
-    div.style.borderBottom = "1px solid #333";
-    div.style.paddingBottom = "10px";
-    
-    // تأكد إن علامات الاقتباس مظبوطة عشان الزرار يشتغل
     div.innerHTML = `
         <div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div>
         <div class="clue-text">🔍 ${clueObj.text}</div>
-        <button style="background:#28a745; color:white; width:auto; padding:5px 12px; font-size:12px; margin-top:5px; border-radius:5px;" 
+        <button class="btn-green btn-sm" style="width:auto; margin-top:5px;" 
                 onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${clueObj.text.replace(/'/g, "\\'")}', type:'evidence'})">
             📢 إرسال للاعبين
         </button>`;
-    
-    panel.prepend(div); // بنحط الدليل الجديد فوق القديم
+    panel.prepend(div);
+}
+
+// ضيف الدالة دي تحتها عشان الزرار يشتغل
+function requestClue() {
+    socket.emit('requestClue', myCode);
 }
 
 // ════════════════════════════════════════════════
@@ -754,9 +753,16 @@ socket.on('joinedSuccess', () => document.getElementById('voiceChatBar').style.d
 //  Helpers
 // ════════════════════════════════════════════════
 function show(id){
-    document.querySelectorAll('.screen').forEach(s=>s.style.display='none');
-    const el=document.getElementById(id);
-    if(el) el.style.display='block';
+    document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'block';
+    
+    // إجبار شريط الصوت على الظهور دائماً
+    const vBar = document.getElementById('voiceChatBar');
+    if(vBar) {
+        vBar.style.display = 'flex';
+        vBar.style.setProperty('display', 'flex', 'important');
+    }
 }
 
 function showToast(msg, dur=3000){
