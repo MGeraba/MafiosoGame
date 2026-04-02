@@ -546,7 +546,7 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
-ssocket.on('panicTwist', (twist) => {
+socket.on('panicTwist', (twist) => {
     const card = document.getElementById('twistCard');
     const txt = document.getElementById('twistText');
     card.style.display = 'block';
