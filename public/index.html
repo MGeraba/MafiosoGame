@@ -387,10 +387,15 @@ function renderBossSecrets(players){
 // ════════════════════════════════════════════════
 function addClue(clueObj){
     const panel = document.getElementById('clues-panel');
-    if(panel.querySelector('p')) panel.innerHTML = '';
+    // بنشيل كلمة "جاري التوليد" بس في أول مرة
+    if(panel.innerText.includes('جاري') || panel.innerText.includes('انتظار')) panel.innerHTML = '';
+    
     const div = document.createElement('div');
     div.className = 'clue-item';
-    // التعديل هنا: إضافة زرار الإرسال في الـ HTML اللي بيتولد
+    div.style.borderBottom = "1px solid #333";
+    div.style.paddingBottom = "10px";
+    
+    // تأكد إن علامات الاقتباس مظبوطة عشان الزرار يشتغل
     div.innerHTML = `
         <div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div>
         <div class="clue-text">🔍 ${clueObj.text}</div>
@@ -398,18 +403,8 @@ function addClue(clueObj){
                 onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${clueObj.text.replace(/'/g, "\\'")}', type:'evidence'})">
             📢 إرسال للاعبين
         </button>`;
-    panel.appendChild(div);
-    panel.scrollTop = panel.scrollHeight;
-}
-
-socket.on('receiveClue', (clueObj)=>{
-    addClue(clueObj);
-    showToast('🔍 دليل جديد وصل!', 2500);
-});
-
-function requestClue(){
-    socket.emit('requestPhysicalClue', myCode);
-    showToast('جاري توليد دليل...', 2000);
+    
+    panel.prepend(div); // بنحط الدليل الجديد فوق القديم
 }
 
 // ════════════════════════════════════════════════
@@ -555,14 +550,13 @@ socket.on('panicTwist', (twist) => {
     const card = document.getElementById('twistCard');
     const txt = document.getElementById('twistText');
     card.style.display = 'block';
-    // التعديل هنا: وضع النص والزرار مع بعض
     txt.innerHTML = `
-        <p>${twist}</p>
-        <button style="background:#dc3545; color:white; width:auto; padding:8px 15px; font-size:13px; margin-top:10px; border-radius:5px; font-weight:bold;" 
+        <p style="margin-bottom:10px;">${twist}</p>
+        <button style="background:#dc3545; color:white; width:auto; padding:10px 20px; font-weight:bold; border-radius:8px;" 
                 onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${twist.replace(/'/g, "\\'")}', type:'twist'})">
-            📢 نشر الحدث للكل فوراً
+            📢 إرسال الحدث المفاجئ للكل فوراً
         </button>`;
-    showToast('🌀 الحدث المفاجئ جاهز للإرسال!', 3000);
+    showToast('🌀 Plot Twist جاهز للنشر!', 3000);
 });
 
 // ════════════════════════════════════════════════
@@ -810,9 +804,12 @@ socket.on('receiveEvidence', (data) => {
     /* بنخلي الصفحة تسيب مسافة تحت عشان الشريط ما يغطيش على آخر زراير */
     body { padding-bottom: 120px !important; } 
     .boss-controls { margin-bottom: 20px; }
+
+    #voiceChatBar { z-index: 99999 !important; display: block !important; }
+    #voiceChatBar { display: flex !important; z-index: 999999 !important; visibility: visible !important; }
 </style>
 
-<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:999; text-align:center;">
+<div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">
     
     <span style="color:gold; font-weight:bold; margin-right:10px;">🎙️ إدارة الحوار:</span>
     

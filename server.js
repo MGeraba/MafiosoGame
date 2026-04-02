@@ -500,10 +500,12 @@ socket.on('triggerPanic', async (roomCode) => {
         // مش بنحذف اللاعب — بنديه فرصة يرجع
     });
 // إرسال دليل محدد من البوس للاعبين
+    // إرسال دليل محدد من البوس للاعبين (تعديل محمود جرابه)
     socket.on('shareEvidence', (data) => {
-        // بنأكد إننا بنبعت لكل اللي في الغرفة بما فيهم البوس واللعيبة
         if (data.roomCode) {
-            io.to(data.roomCode).emit('receiveEvidence', {
+            console.log("📢 بنبعت دليل للغرفة:", data.roomCode);
+            // لازم نستخدم io.in عشان نبعت للكل في الغرفة
+            io.in(data.roomCode).emit('receiveEvidence', {
                 text: data.text,
                 type: data.type
             });
@@ -519,6 +521,17 @@ socket.on('triggerPanic', async (roomCode) => {
     showInGameNotification(data.type === 'evidence' ? "🔍 دليل جديد" : "🚨 حدث مفاجئ", data.text);
 });
 
+function show(id){
+    document.querySelectorAll('.screen').forEach(s => {
+        s.style.display = 'none';
+    });
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'block';
+    
+    // نأكد إن شريط الصوت هيفضل شغال
+    const vBar = document.getElementById('voiceChatBar');
+    if(vBar) vBar.style.setProperty('display', 'flex', 'important');
+}
 });
 
 const PORT = process.env.PORT || 3000;
