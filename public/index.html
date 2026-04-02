@@ -806,15 +806,7 @@ function showInGameNotification(title, msg) {
 }
 
 // الكود اللي بيخلي اللاعب يستقبل "النشر" اللي البوس عمله
-socket.on('receiveEvidence', (data) => {
-    // تشغيل الصوت (تأكد إنك ضفت وسوم الـ audio اللي بعتهالك فوق)
-    const sound = data.type === 'evidence' ? document.getElementById('evidencePop') : document.getElementById('twistPop');
-    if(sound) sound.play().catch(e => console.log("الصوت محظور"));
 
-    // إظهار الرسالة للاعب
-    const title = data.type === 'evidence' ? "🔍 دليل جديد!" : "🚨 تحول مفاجئ!";
-    showInGameNotification(title, data.text);
-});
 </script>
 <style>
     /* بنخلي الصفحة تسيب مسافة تحت عشان الشريط ما يغطيش على آخر زراير */
