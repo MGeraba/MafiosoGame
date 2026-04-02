@@ -358,21 +358,7 @@ io.on('connection', (socket) => {
         io.to(room.boss).emit('receiveClue', clueObj);
     }
 
-    socket.on('receiveClue', (clueObj) => {
-    const panel = document.getElementById('clues-panel');
-    if(panel.querySelector('p')) panel.innerHTML=''; // مسح نص "جاري التوليد"
-    const div = document.createElement('div');
-    div.className = 'clue-item';
-    div.innerHTML = `
-        <div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div>
-        <div class="clue-text">🔍 ${clueObj.text}</div>
-        <button style="background:#28a745; color:white; width:auto; padding:5px 12px; font-size:12px;" 
-                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${clueObj.text.replace(/'/g, "\\'")}', type:'evidence'})">
-            📢 إرسال للاعبين
-        </button>`;
-    panel.appendChild(div);
-    panel.scrollTop = panel.scrollHeight;
-});
+    
 
    // ── Panic Mode — حدث مفاجئ + تأثير بصري (تعديل محمود جربا) ────────────────────
 socket.on('triggerPanic', async (roomCode) => {
@@ -503,36 +489,18 @@ socket.on('triggerPanic', async (roomCode) => {
     // إرسال دليل محدد من البوس للاعبين (تعديل محمود جرابه)
     socket.on('shareEvidence', (data) => {
         if (data.roomCode) {
-            console.log("📢 بنبعت دليل للغرفة:", data.roomCode);
-            // لازم نستخدم io.in عشان نبعت للكل في الغرفة
             io.in(data.roomCode).emit('receiveEvidence', {
                 text: data.text,
                 type: data.type
             });
         }
     });
-    socket.on('receiveEvidence', (data) => {
-    // تشغيل صوت التنبيه
-    const soundId = (data.type === 'evidence') ? 'evidencePop' : 'twistPop';
-    const sound = document.getElementById(soundId);
-    if(sound) sound.play().catch(() => {});
 
-    // إظهار التنبيه
-    showInGameNotification(data.type === 'evidence' ? "🔍 دليل جديد" : "🚨 حدث مفاجئ", data.text);
-});
-
-function show(id){
-    document.querySelectorAll('.screen').forEach(s => {
-        s.style.display = 'none';
+    socket.on('disconnect', () => {
+        // مش بنحذف اللاعب — بنديه فرصة يرجع
     });
-    const el = document.getElementById(id);
-    if(el) el.style.display = 'block';
-    
-    // نأكد إن شريط الصوت هيفضل شغال
-    const vBar = document.getElementById('voiceChatBar');
-    if(vBar) vBar.style.setProperty('display', 'flex', 'important');
-}
 });
+
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

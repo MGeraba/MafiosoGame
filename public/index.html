@@ -546,19 +546,52 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
-socket.on('panicTwist', (twist) => {
+ssocket.on('panicTwist', (twist) => {
     const card = document.getElementById('twistCard');
     const txt = document.getElementById('twistText');
     card.style.display = 'block';
-    txt.innerHTML = `
-        <p style="margin-bottom:10px;">${twist}</p>
-        <button style="background:#dc3545; color:white; width:auto; padding:10px 20px; font-weight:bold; border-radius:8px;" 
-                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${twist.replace(/'/g, "\\'")}', type:'twist'})">
-            📢 إرسال الحدث المفاجئ للكل فوراً
-        </button>`;
-    showToast('🌀 Plot Twist جاهز للنشر!', 3000);
-});
 
+    // ✅ كل مرة نضيف الـ twist الجديد فوق القديم بدل ما نمسحه
+    const entry = document.createElement('div');
+    entry.style.cssText = 'border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:10px;';
+    const safeText = twist.replace(/'/g, "\\'").replace(/\n/g, ' ');
+    entry.innerHTML = `
+        <p style="margin-bottom:8px; color:#ffb3b3; font-style:italic;">${twist}</p>
+        <button style="background:#dc3545; color:white; width:auto; padding:8px 16px; font-size:13px; border-radius:6px;" 
+                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${safeText}', type:'twist'})">
+            📢 إرسال للكل
+        </button>`;
+    txt.prepend(entry); // ✅ الجديد فوق القديم
+    showToast('🌀 Plot Twist جديد جاهز!', 2500);
+});
+// ════════════════════════════════════════════════
+//  استقبال الدليل أو الحدث المبعوت من البوس
+// ════════════════════════════════════════════════
+socket.on('receiveEvidence', (data) => {
+    const isEvidence = data.type === 'evidence';
+    const title = isEvidence ? '🔍 دليل جديد من البوس' : '🌀 حدث مفاجئ!';
+    const color = isEvidence ? '#7fff7f' : '#ff6b6b';
+
+    // إظهار إشعار بارز فوق الشاشة
+    let notif = document.getElementById('evidence-notif');
+    if (!notif) {
+        notif = document.createElement('div');
+        notif.id = 'evidence-notif';
+        notif.style.cssText = `
+            position:fixed; top:50px; left:50%; transform:translateX(-50%);
+            background:#111; border:2px solid ${color}; color:#fff;
+            padding:16px 20px; border-radius:12px; z-index:8500;
+            max-width:90%; text-align:center; font-size:15px;
+            box-shadow: 0 0 20px ${color}44;
+        `;
+        document.body.appendChild(notif);
+    }
+    notif.style.borderColor = color;
+    notif.innerHTML = `<b style="color:${color}">${title}</b><br><br>${data.text}<br><br>
+        <button onclick="document.getElementById('evidence-notif').style.display='none'" 
+                style="width:auto;padding:6px 20px;font-size:13px">حسناً ✓</button>`;
+    notif.style.display = 'block';
+});
 // ════════════════════════════════════════════════
 //  Execution Result
 // ════════════════════════════════════════════════
