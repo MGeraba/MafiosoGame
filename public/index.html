@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -162,18 +163,16 @@
 
     <!-- الأدلة والهنتات (ثابتة تتراكم) -->
     <div class="card">
-    <h4 style="color:#7fff7f;margin-bottom:8px">🔍 لوحة تحكم الأدلة (للبوس)</h4>
-    <div id="clues-panel" style="max-height:200px; overflow-y:auto; margin-bottom:10px;">
-        <p style="color:#555;font-size:0.9em">في انتظار توليد الأدلة...</p>
+        <h4 style="color:#7fff7f;margin-bottom:8px">🔍 الأدلة والهنتات</h4>
+        <div id="clues-panel"><p style="color:#555;font-size:.9em">جاري توليد أول دليل...</p></div>
+        <hr class="sep">
+        <button class="btn-blue btn-sm" onclick="requestClue()">طلب دليل جديد 🔍</button>
     </div>
-    <hr class="sep">
-<button class="btn-blue btn-sm" onclick="requestClue()">توليد دليل جديد 🔍</button>
-</div>
 
     <!-- Plot Twist من Panic -->
-    <<div class="card" id="twistCard" style="display:none; border: 2px solid #ff4d4d;">
-    <h4 style="color:#ff4d4d;margin-bottom:8px">⚠️ حدث مفاجئ سري (Plot Twist)</h4>
-    <div id="twistText" style="text-align:right; color:#fff; background:#200; padding:10px; border-radius:8px; margin-bottom:10px;"></div>
+    <div class="card" id="twistCard" style="display:none">
+        <h4 style="color:#ff6b6b;margin-bottom:8px">🌀 Plot Twist!</h4>
+        <div id="twistText" style="text-align:right;color:#ffb3b3;line-height:1.6;font-style:italic"></div>
     </div>
 
     <!-- التصويت -->
@@ -386,24 +385,23 @@ function renderBossSecrets(players){
 //  Clues (Boss Only, Persistent)
 // ════════════════════════════════════════════════
 function addClue(clueObj){
-    const panel = document.getElementById('clues-panel');
-    if(panel.innerText.includes('جاري') || panel.innerText.includes('انتظار')) panel.innerHTML = '';
-    
-    const div = document.createElement('div');
-    div.className = 'clue-item';
-    div.innerHTML = `
-        <div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div>
-        <div class="clue-text">🔍 ${clueObj.text}</div>
-        <button class="btn-green btn-sm" style="width:auto; margin-top:5px;" 
-                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${clueObj.text.replace(/'/g, "\\'")}', type:'evidence'})">
-            📢 إرسال للاعبين
-        </button>`;
-    panel.prepend(div);
+    const panel=document.getElementById('clues-panel');
+    if(panel.querySelector('p')) panel.innerHTML='';
+    const div=document.createElement('div');
+    div.className='clue-item';
+    div.innerHTML=`<div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div><div class="clue-text">🔍 ${clueObj.text}</div>`;
+    panel.appendChild(div);
+    panel.scrollTop=panel.scrollHeight;
 }
 
-// ضيف الدالة دي تحتها عشان الزرار يشتغل
-function requestClue() {
-    socket.emit('requestClue', myCode);
+socket.on('receiveClue', (clueObj)=>{
+    addClue(clueObj);
+    showToast('🔍 دليل جديد وصل!', 2500);
+});
+
+function requestClue(){
+    socket.emit('requestPhysicalClue', myCode);
+    showToast('جاري توليد دليل...', 2000);
 }
 
 // ════════════════════════════════════════════════
@@ -545,24 +543,14 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
-socket.on('panicTwist', (twist) => {
-    const card = document.getElementById('twistCard');
-    const txt = document.getElementById('twistText');
-    card.style.display = 'block';
-
-    // ✅ كل مرة نضيف الـ twist الجديد فوق القديم بدل ما نمسحه
-    const entry = document.createElement('div');
-    entry.style.cssText = 'border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:10px;';
-    const safeText = twist.replace(/'/g, "\\'").replace(/\n/g, ' ');
-    entry.innerHTML = `
-        <p style="margin-bottom:8px; color:#ffb3b3; font-style:italic;">${twist}</p>
-        <button style="background:#dc3545; color:white; width:auto; padding:8px 16px; font-size:13px; border-radius:6px;" 
-                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${safeText}', type:'twist'})">
-            📢 إرسال للكل
-        </button>`;
-    txt.prepend(entry); // ✅ الجديد فوق القديم
-    showToast('🌀 Plot Twist جديد جاهز!', 2500);
+socket.on('panicTwist', (twist)=>{
+    const card=document.getElementById('twistCard');
+    const txt=document.getElementById('twistText');
+    card.style.display='block';
+    txt.textContent=twist;
+    showToast('🌀 Plot Twist تم توليده!', 3000);
 });
+
 // ════════════════════════════════════════════════
 //  Execution Result
 // ════════════════════════════════════════════════
@@ -627,44 +615,27 @@ let localStream;
 let peers = {};
 const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-// 1. الدالة اللي بتشغل المايك (اللي كنت بتدور عليها)
+// 1. تشغيل المايك
 async function initVoiceChat() {
     try {
-        // إعدادات الصوت عشان يشتغل على السماعات والايربودز بوضوح
-        const constraints = { 
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            } 
-        };
-        
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         document.getElementById('joinVoiceBtn').style.display = 'none';
         document.getElementById('muteBtn').style.display = 'inline-block';
-        
-        // إرسال إشارة للسيرفر إننا دخلنا Voice
-        if (typeof myCode !== 'undefined' && myCode) {
-            socket.emit('joinVoice', myCode);
-        }
-        console.log("🎙️ المايك اشتغل بنجاح");
+        socket.emit('joinVoice', myCode);
+        alert("المايك شغال! اتكلم مع زمايلك");
     } catch (e) {
-        console.error("خطأ في المايك:", e);
-        alert("يا بطل لازم توافق على صلاحية المايك وتكون فاتح رابط HTTPS");
+        alert("لازم توافق على استخدام المايك");
     }
 }
 
-// 2. كتم وفتح الصوت
+// 2. كتم/فتح الصوت
 function toggleMute() {
-    if(localStream) {
-        const track = localStream.getAudioTracks()[0];
-        track.enabled = !track.enabled;
-        document.getElementById('muteBtn').innerText = track.enabled ? "كتم 🔇" : "تحدث 🔊";
-        document.getElementById('muteBtn').style.background = track.enabled ? "#ffc107" : "#28a745";
-    }
+    const track = localStream.getAudioTracks()[0];
+    track.enabled = !track.enabled;
+    document.getElementById('muteBtn').innerText = track.enabled ? "كتم الصوت 🔇" : "فتح الصوت 🔊";
 }
 
-// 3. استقبال اللاعبين الجدد في الصوت
+// 3. الربط بين اللاعبين (Signaling)
 socket.on('user-joined-voice', (userId) => {
     if (localStream) createPeer(userId, true);
 });
@@ -679,35 +650,24 @@ socket.on('webrtc-offer', async (data) => {
 });
 
 socket.on('webrtc-answer', (data) => {
-    if (peers[data.sender]) {
-        peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp));
-    }
+    if (peers[data.sender]) peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp));
 });
 
 socket.on('webrtc-ice-candidate', (data) => {
-    if (peers[data.sender]) {
-        peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
-    }
+    if (peers[data.sender]) peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
 });
 
-// 4. دالة الربط التقني بين الموبايلات
 function createPeer(targetId, initiator) {
     const peer = new RTCPeerConnection(rtcConfig);
     peers[targetId] = peer;
-    
     localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
-    
     peer.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
-    
     peer.ontrack = e => {
         let aud = document.createElement('audio');
         aud.autoplay = true;
         aud.srcObject = e.streams[0];
-        // محاولة تشغيل الصوت إجبارياً للسماعات
-        aud.play().catch(() => console.log("محتاج تفاعل من المستخدم لتشغيل الصوت"));
         document.getElementById('audioPlayers').appendChild(aud);
     };
-    
     if (initiator) {
         peer.createOffer().then(o => {
             peer.setLocalDescription(o);
@@ -725,16 +685,9 @@ socket.on('joinedSuccess', () => document.getElementById('voiceChatBar').style.d
 //  Helpers
 // ════════════════════════════════════════════════
 function show(id){
-    document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
-    const el = document.getElementById(id);
-    if(el) el.style.display = 'block';
-    
-    // إجبار شريط الصوت على الظهور دائماً
-    const vBar = document.getElementById('voiceChatBar');
-    if(vBar) {
-        vBar.style.display = 'flex';
-        vBar.style.setProperty('display', 'flex', 'important');
-    }
+    document.querySelectorAll('.screen').forEach(s=>s.style.display='none');
+    const el=document.getElementById(id);
+    if(el) el.style.display='block';
 }
 
 function showToast(msg, dur=3000){
@@ -769,65 +722,24 @@ socket.on('error', (msg) => {
         window.location.href = window.location.origin;
     }
 });
-
-
-
-function showInGameNotification(title, msg) {
-    // كود بسيط لإظهار رسالة فوق اللعبة
-    const notifyDiv = document.createElement('div');
-    notifyDiv.style = "position:fixed; top:20%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.9); color:gold; padding:20px; border:2px solid gold; z-index:20000; text-align:center; width:80%; border-radius:15px; box-shadow:0 0 20px gold;";
-    notifyDiv.innerHTML = `<h3>${title}</h3><p style="color:white;">${msg}</p><button onclick="this.parentElement.remove()" style="background:gold; color:black; width:auto; padding:5px 15px;">فهمت</button>`;
-    document.body.appendChild(notifyDiv);
-    
-    // تختفي لوحدها بعد 10 ثواني لو اللاعب مقفلهاش
-    setTimeout(() => { if(notifyDiv) notifyDiv.remove(); }, 10000);
-}
-
-// استقبال الدلائل اللي البوس بينشرها (عند اللاعبين)
-socket.on('receiveEvidence', (data) => {
-    // 1. تشغيل صوت التنبيه (تأكد إن الوسوم موجودة في البداية)
-    const soundId = (data.type === 'evidence') ? 'evidencePop' : 'twistPop';
-    const sound = document.getElementById(soundId);
-    if(sound) sound.play().catch(() => console.log("الصوت محظور"));
-
-    // 2. إظهار الإشعار للاعب
-    const title = (data.type === 'evidence') ? "🔍 دليل جديد!" : "🚨 تحول مفاجئ!";
-    showInGameNotification(title, data.text);
-});
-
-// دالة طلب دليل جديد (عشان تربط الزرار بالسيرفر)
-function requestClue() {
-    if(!myCode) return;
-    showToast("جاري طلب دليل من الـ AI...", 2000);
-    socket.emit('requestClue', myCode);
-}
 </script>
-<style>
-    /* بنخلي الصفحة تسيب مسافة تحت عشان الشريط ما يغطيش على آخر زراير */
-    body { padding-bottom: 120px !important; } 
-    .boss-controls { margin-bottom: 20px; }
-
-    #voiceChatBar { z-index: 99999 !important; display: block !important; }
-    #voiceChatBar { display: flex !important; z-index: 999999 !important; visibility: visible !important; }
-</style>
-
-<div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">
+<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(17, 17, 17, 0.95); padding:15px 10px 30px 10px; border-top:2px solid #d4af37; z-index:9999; text-align:center; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
     
-    <span style="color:gold; font-weight:bold; margin-right:10px;">🎙️ إدارة الحوار:</span>
+    <span style="color:gold; font-weight:bold; margin-left:15px; vertical-align: middle;">🎙️ إدارة الحوار:</span>
     
-    <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; padding:8px 20px; font-size:13px; font-weight:bold;">تشغيل المايك</button>
+    <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
+        تشغيل المايك
+    </button>
     
-    <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; border:none; border-radius:5px; padding:8px 20px; font-size:13px; font-weight:bold;">كتم 🔇</button>
+    <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
+        كتم 🔇
+    </button>
 
     <div id="audioPlayers" style="display:none;"></div>
 
-    <div style="position: absolute; bottom: 5px; right: 10px; font-size: 10px; color: rgba(212, 175, 55, 0.5); pointer-events: none;">
-        Dev: <span style="color: gold;">Mahmoud Geraba</span>
+    <div style="position: absolute; bottom: 5px; right: 15px; font-size: 11px; color: rgba(212, 175, 55, 0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; pointer-events: none;">
+        Developed by <span style="font-weight: bold; color: gold; text-shadow: 1px 1px 2px black;">Mahmoud Geraba</span>
     </div>
 </div>
-
-<audio id="evidencePop" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
-<audio id="twistPop" src="https://actions.google.com/sounds/v1/horror/ambient_hum_short.ogg" preload="auto"></audio>
-
 </body>
 </html>
