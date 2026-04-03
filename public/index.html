@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mafioso Trial 🕵️</title>
@@ -9,70 +10,66 @@
     <!-- QR Code library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh}
-        h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
-        .card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
-        button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s}
-        button:active{transform:scale(.95);background:#ffdf00}
-        input,textarea{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radius:8px;width:90%;margin:8px 0;font-size:16px;box-sizing:border-box}
-        textarea{height:80px;resize:vertical}
-        .screen{display:none}
-        .player-tag{display:inline-block;background:#222;padding:8px 15px;border-radius:20px;margin:5px;font-size:14px;color:#00ffcc;border:1px solid #00ffcc}
-        .loader{border:4px solid #333;border-top:4px solid #d4af37;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
-        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        :root {
+    --gold: #d4af37;
+    --dark-bg: #0d0d0d;
+    --card-bg: rgba(25, 25, 25, 0.9);
+    --neon-red: #ff3131;
+}
 
-        /* ── Connection Bar ── */
-        #conn-bar{position:fixed;top:0;left:0;right:0;padding:7px;font-size:13px;text-align:center;z-index:9999;display:none;transition:.3s}
-        #conn-bar.offline{background:#c0392b;display:block}
-        #conn-bar.online{background:#27ae60;display:block;animation:fadeBar 2s 1.5s forwards}
-        @keyframes fadeBar{to{opacity:0;pointer-events:none}}
+body {
+    background: var(--dark-bg);
+    background-image: radial-gradient(circle at center, #1a1a1a 0%, #0d0d0d 100%);
+    color: #e0e0e0;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+}
 
-        /* ── Panic Overlay ── */
-        #panicOverlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(160,0,0,.95);flex-direction:column;align-items:center;justify-content:center;animation:flashRed .5s infinite alternate}
-        #panicOverlay.active{display:flex}
-        @keyframes flashRed{from{background:rgba(160,0,0,.95)}to{background:rgba(255,20,20,.98)}}
-        .panic-title{font-size:2.2em;font-weight:bold;letter-spacing:4px;color:#fff;text-shadow:0 0 20px #f00}
-        .panic-timer{font-size:5em;font-weight:bold;color:#fff;margin:10px 0;text-shadow:0 0 30px #ff0}
-        #panicTwistText{font-size:1em;color:#ffe;max-width:400px;line-height:1.6;margin-top:10px;padding:0 20px;font-style:italic}
+.card {
+    background: var(--card-bg);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    margin-bottom: 20px;
+    transition: 0.3s;
+}
 
-        /* ── Clues Panel ── */
-        #clues-panel{text-align:right}
-        .clue-item{background:#0d1f0d;border:1px solid #2d6a2d;border-radius:8px;padding:10px 14px;margin:6px 0}
-        .clue-meta{font-size:.75em;color:#666;margin-bottom:4px}
-        .clue-text{color:#7fff7f;line-height:1.5;font-size:.95em}
+button {
+    background: linear-gradient(135deg, var(--gold), #b8860b);
+    color: #000;
+    border-radius: 12px;
+    padding: 14px;
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: 1px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+}
 
-        /* ── QR Code ── */
-        #qrcode{margin:10px auto;display:flex;justify-content:center}
-        #qrcode img,#qrcode canvas{border-radius:8px;border:3px solid #d4af37;background:#fff;padding:6px}
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+}
 
-        /* ── Story Box ── */
-        .story-box{background:#0a1520;border:1px solid #1a4a7a;border-radius:8px;padding:12px 16px;text-align:right;line-height:1.7;font-size:1em;color:#b0d4f1;margin:10px 0}
+.clue-item {
+    background: rgba(255,255,255,0.05);
+    border-right: 4px solid var(--gold);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    text-align: right;
+}
 
-        /* ── Result Message ── */
-        #resultOverlay{display:none;position:fixed;inset:0;z-index:8000;align-items:center;justify-content:center;flex-direction:column;padding:20px;background:rgba(0,0,0,.88)}
-        #resultOverlay.active{display:flex}
-        .result-box{background:#151515;border:2px solid #d4af37;border-radius:16px;padding:28px;max-width:420px;width:100%}
-        .result-icon{font-size:4em;margin-bottom:10px}
-        .result-msg{font-size:1.1em;line-height:1.7;margin-bottom:20px;color:#eee}
-
-        /* ── Toast ── */
-        #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;border:1px solid #d4af37;color:#fff;padding:12px 22px;border-radius:10px;z-index:9999;max-width:90%;font-size:14px;display:none;text-align:center}
-
-        /* ── Ghost Badge ── */
-        .ghost-badge{background:#333;color:#888;border:1px solid #555;border-radius:20px;padding:4px 12px;font-size:.85em;margin:8px auto;display:inline-block}
-
-        /* ── Misc ── */
-        .sep{border:none;border-top:1px solid #2a2a2a;margin:12px 0}
-        .label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right;display:block}
-        .badge-mafia{color:#ff4d4d;font-size:1.3em;font-weight:bold}
-        .badge-civ{color:#00ffcc;font-size:1.3em;font-weight:bold}
-        .btn-danger{background:#dc3545!important;color:#fff!important}
-        .btn-green{background:#28a745!important;color:#fff!important}
-        .btn-blue{background:#17a2b8!important;color:#fff!important}
-        .btn-gray{background:#444!important;color:#fff!important}
-        .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
-    </style>
+/* شريط الصوت بشكل احترافي */
+#voiceChatBar {
+    background: rgba(15, 15, 15, 0.95) !important;
+    backdrop-filter: blur(15px);
+    border-top: 1px solid var(--gold) !important;
+    padding: 15px !important;
+    border-radius: 25px 25px 0 0;
+}
+</style>
 </head>
 <body>
 
@@ -146,44 +143,28 @@
 </div>
 
 <!-- ══════════════════ BOSS IN GAME ══════════════════ -->
-<div id="screen-boss-game" class="screen">
-    <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
-
-    <!-- القصة للبوس -->
+<div id="screen-boss-game" class="screen" style="display:none">
     <div class="card">
-        <span class="label">📖 القصة الكاملة (للبوس فقط)</span>
-        <div class="story-box" id="bossStory"></div>
+        <h2 style="color:var(--gold)">🎙️ غرفة التحكم (The Godfather)</h2>
+        <div id="game-timer" style="font-size: 24px; color: var(--neon-red); font-weight: bold; margin: 10px 0;">00:00</div>
+        <p id="boss-story-display" style="font-style:italic; opacity:0.8"></p>
     </div>
 
-    <!-- الأدوار الحقيقية -->
     <div class="card">
-        <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار الحقيقية</h4>
-        <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:1.8"></div>
+        <h3 style="display:flex; justify-content:space-between; align-items:center;">
+            <span>🔍 سجل الأدلة</span>
+            <button class="btn-sm" onclick="requestClue()" style="width:auto; padding:5px 15px;">طلب دليل +</button>
+        </h3>
+        <div id="clues-panel" style="max-height:300px; overflow-y:auto; margin-top:15px;">
+            <p>في انتظار بدء التحقيق...</p>
+        </div>
     </div>
 
-    <!-- الأدلة والهنتات (ثابتة تتراكم) -->
-    <div class="card">
-        <h4 style="color:#7fff7f;margin-bottom:8px">🔍 الأدلة والهنتات</h4>
-        <div id="clues-panel"><p style="color:#555;font-size:.9em">جاري توليد أول دليل...</p></div>
-        <hr class="sep">
-        <button class="btn-blue btn-sm" onclick="requestClue()">طلب دليل جديد 🔍</button>
-    </div>
-
-    <!-- Plot Twist من Panic -->
-    <div class="card" id="twistCard" style="display:none">
-        <h4 style="color:#ff6b6b;margin-bottom:8px">🌀 Plot Twist!</h4>
-        <div id="twistText" style="text-align:right;color:#ffb3b3;line-height:1.6;font-style:italic"></div>
-    </div>
-
-    <!-- التصويت -->
-    <div class="card">
-        <h4 style="margin-bottom:8px">📊 نتائج التصويت</h4>
-        <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
-        <hr class="sep">
-        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
-            <button class="btn-danger btn-sm" onclick="confirmExecution()">تثبيت الإعدام 💀</button>
-            <button class="btn-blue btn-sm" onclick="triggerPanic()">PANIC MODE 🚨</button>
-            <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
+    <div class="card" style="border-color: var(--neon-red)">
+        <h3>🔥 منطقة الخطر (Panic Mode)</h3>
+        <button onclick="socket.emit('triggerPanic', myCode)" style="background:var(--neon-red); color:white;">تفعيل الحدث المفاجئ</button>
+        <div id="twistCard" style="display:none; margin-top:15px; padding:15px; background:rgba(255,0,0,0.1); border-radius:10px;">
+            <div id="twistText"></div>
         </div>
     </div>
 </div>
@@ -394,10 +375,28 @@ function addClue(clueObj){
     panel.scrollTop=panel.scrollHeight;
 }
 
-socket.on('receiveClue', (clueObj)=>{
-    addClue(clueObj);
-    showToast('🔍 دليل جديد وصل!', 2500);
+// دالة عرض الدليل بشكل "نظيف" زي الموقع التاني
+socket.on('receiveClue', (clueObj) => {
+    const panel = document.getElementById('clues-panel');
+    if(panel.innerHTML.includes('انتظار')) panel.innerHTML = '';
+    
+    const html = `
+        <div class="clue-item animate__animated animate__fadeInRight">
+            <small style="color:var(--gold)">الجولة ${clueObj.round} • ${clueObj.time}</small>
+            <p style="margin:10px 0; font-size:1.1em;">${clueObj.text}</p>
+            <button onclick="shareClue('${clueObj.text.replace(/'/g, "\\'")}')" 
+                    style="background:#28a745; padding:5px 10px; font-size:12px; width:auto;">
+                نشر الدليل للاعبين 📢
+            </button>
+        </div>
+    `;
+    panel.insertAdjacentHTML('afterbegin', html);
 });
+
+function shareClue(txt) {
+    socket.emit('shareEvidence', { roomCode: myCode, text: txt, type: 'evidence' });
+    showToast("تم نشر الدليل بنجاح", 2000);
+}
 
 function requestClue(){
     socket.emit('requestPhysicalClue', myCode);
