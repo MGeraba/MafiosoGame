@@ -1,8 +1,6 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mafioso Trial 🕵️</title>
@@ -10,66 +8,70 @@
     <!-- QR Code library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        :root {
-    --gold: #d4af37;
-    --dark-bg: #0d0d0d;
-    --card-bg: rgba(25, 25, 25, 0.9);
-    --neon-red: #ff3131;
-}
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh}
+        h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
+        .card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
+        button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s}
+        button:active{transform:scale(.95);background:#ffdf00}
+        input,textarea{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radius:8px;width:90%;margin:8px 0;font-size:16px;box-sizing:border-box}
+        textarea{height:80px;resize:vertical}
+        .screen{display:none}
+        .player-tag{display:inline-block;background:#222;padding:8px 15px;border-radius:20px;margin:5px;font-size:14px;color:#00ffcc;border:1px solid #00ffcc}
+        .loader{border:4px solid #333;border-top:4px solid #d4af37;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 
-body {
-    background: var(--dark-bg);
-    background-image: radial-gradient(circle at center, #1a1a1a 0%, #0d0d0d 100%);
-    color: #e0e0e0;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
-}
+        /* ── Connection Bar ── */
+        #conn-bar{position:fixed;top:0;left:0;right:0;padding:7px;font-size:13px;text-align:center;z-index:9999;display:none;transition:.3s}
+        #conn-bar.offline{background:#c0392b;display:block}
+        #conn-bar.online{background:#27ae60;display:block;animation:fadeBar 2s 1.5s forwards}
+        @keyframes fadeBar{to{opacity:0;pointer-events:none}}
 
-.card {
-    background: var(--card-bg);
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    margin-bottom: 20px;
-    transition: 0.3s;
-}
+        /* ── Panic Overlay ── */
+        #panicOverlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(160,0,0,.95);flex-direction:column;align-items:center;justify-content:center;animation:flashRed .5s infinite alternate}
+        #panicOverlay.active{display:flex}
+        @keyframes flashRed{from{background:rgba(160,0,0,.95)}to{background:rgba(255,20,20,.98)}}
+        .panic-title{font-size:2.2em;font-weight:bold;letter-spacing:4px;color:#fff;text-shadow:0 0 20px #f00}
+        .panic-timer{font-size:5em;font-weight:bold;color:#fff;margin:10px 0;text-shadow:0 0 30px #ff0}
+        #panicTwistText{font-size:1em;color:#ffe;max-width:400px;line-height:1.6;margin-top:10px;padding:0 20px;font-style:italic}
 
-button {
-    background: linear-gradient(135deg, var(--gold), #b8860b);
-    color: #000;
-    border-radius: 12px;
-    padding: 14px;
-    text-transform: uppercase;
-    font-weight: 900;
-    letter-spacing: 1px;
-    border: none;
-    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-}
+        /* ── Clues Panel ── */
+        #clues-panel{text-align:right}
+        .clue-item{background:#0d1f0d;border:1px solid #2d6a2d;border-radius:8px;padding:10px 14px;margin:6px 0}
+        .clue-meta{font-size:.75em;color:#666;margin-bottom:4px}
+        .clue-text{color:#7fff7f;line-height:1.5;font-size:.95em}
 
-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
-}
+        /* ── QR Code ── */
+        #qrcode{margin:10px auto;display:flex;justify-content:center}
+        #qrcode img,#qrcode canvas{border-radius:8px;border:3px solid #d4af37;background:#fff;padding:6px}
 
-.clue-item {
-    background: rgba(255,255,255,0.05);
-    border-right: 4px solid var(--gold);
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    text-align: right;
-}
+        /* ── Story Box ── */
+        .story-box{background:#0a1520;border:1px solid #1a4a7a;border-radius:8px;padding:12px 16px;text-align:right;line-height:1.7;font-size:1em;color:#b0d4f1;margin:10px 0}
 
-/* شريط الصوت بشكل احترافي */
-#voiceChatBar {
-    background: rgba(15, 15, 15, 0.95) !important;
-    backdrop-filter: blur(15px);
-    border-top: 1px solid var(--gold) !important;
-    padding: 15px !important;
-    border-radius: 25px 25px 0 0;
-}
-</style>
+        /* ── Result Message ── */
+        #resultOverlay{display:none;position:fixed;inset:0;z-index:8000;align-items:center;justify-content:center;flex-direction:column;padding:20px;background:rgba(0,0,0,.88)}
+        #resultOverlay.active{display:flex}
+        .result-box{background:#151515;border:2px solid #d4af37;border-radius:16px;padding:28px;max-width:420px;width:100%}
+        .result-icon{font-size:4em;margin-bottom:10px}
+        .result-msg{font-size:1.1em;line-height:1.7;margin-bottom:20px;color:#eee}
+
+        /* ── Toast ── */
+        #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;border:1px solid #d4af37;color:#fff;padding:12px 22px;border-radius:10px;z-index:9999;max-width:90%;font-size:14px;display:none;text-align:center}
+
+        /* ── Ghost Badge ── */
+        .ghost-badge{background:#333;color:#888;border:1px solid #555;border-radius:20px;padding:4px 12px;font-size:.85em;margin:8px auto;display:inline-block}
+
+        /* ── Misc ── */
+        .sep{border:none;border-top:1px solid #2a2a2a;margin:12px 0}
+        .label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right;display:block}
+        .badge-mafia{color:#ff4d4d;font-size:1.3em;font-weight:bold}
+        .badge-civ{color:#00ffcc;font-size:1.3em;font-weight:bold}
+        .btn-danger{background:#dc3545!important;color:#fff!important}
+        .btn-green{background:#28a745!important;color:#fff!important}
+        .btn-blue{background:#17a2b8!important;color:#fff!important}
+        .btn-gray{background:#444!important;color:#fff!important}
+        .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
+    </style>
 </head>
 <body>
 
@@ -143,28 +145,46 @@ button:hover {
 </div>
 
 <!-- ══════════════════ BOSS IN GAME ══════════════════ -->
-<div id="screen-boss-game" class="screen" style="display:none">
+<div id="screen-boss-game" class="screen">
+    <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
+
+    <!-- القصة للبوس -->
     <div class="card">
-        <h2 style="color:var(--gold)">🎙️ غرفة التحكم (The Godfather)</h2>
-        <div id="game-timer" style="font-size: 24px; color: var(--neon-red); font-weight: bold; margin: 10px 0;">00:00</div>
-        <p id="boss-story-display" style="font-style:italic; opacity:0.8"></p>
+        <span class="label">📖 القصة الكاملة (للبوس فقط)</span>
+        <div class="story-box" id="bossStory"></div>
     </div>
 
+    <!-- الأدوار الحقيقية -->
     <div class="card">
-        <h3 style="display:flex; justify-content:space-between; align-items:center;">
-            <span>🔍 سجل الأدلة</span>
-            <button class="btn-sm" onclick="requestClue()" style="width:auto; padding:5px 15px;">طلب دليل +</button>
-        </h3>
-        <div id="clues-panel" style="max-height:300px; overflow-y:auto; margin-top:15px;">
-            <p>في انتظار بدء التحقيق...</p>
-        </div>
+        <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار الحقيقية</h4>
+        <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:1.8"></div>
     </div>
 
-    <div class="card" style="border-color: var(--neon-red)">
-        <h3>🔥 منطقة الخطر (Panic Mode)</h3>
-        <button onclick="socket.emit('triggerPanic', myCode)" style="background:var(--neon-red); color:white;">تفعيل الحدث المفاجئ</button>
-        <div id="twistCard" style="display:none; margin-top:15px; padding:15px; background:rgba(255,0,0,0.1); border-radius:10px;">
-            <div id="twistText"></div>
+    <!-- الأدلة والهنتات (ثابتة تتراكم) -->
+    <div class="card">
+    <h4 style="color:#7fff7f;margin-bottom:8px">🔍 لوحة تحكم الأدلة (للبوس)</h4>
+    <div id="clues-panel" style="max-height:200px; overflow-y:auto; margin-bottom:10px;">
+        <p style="color:#555;font-size:0.9em">في انتظار توليد الأدلة...</p>
+    </div>
+    <hr class="sep">
+    <button class="btn-blue btn-sm" onclick="requestClue()">توليد دليل جديد من AI 🔍</button>
+</div>
+
+    <!-- Plot Twist من Panic -->
+    <<div class="card" id="twistCard" style="display:none; border: 2px solid #ff4d4d;">
+    <h4 style="color:#ff4d4d;margin-bottom:8px">⚠️ حدث مفاجئ سري (Plot Twist)</h4>
+    <div id="twistText" style="text-align:right; color:#fff; background:#200; padding:10px; border-radius:8px; margin-bottom:10px;"></div>
+    </div>
+
+    <!-- التصويت -->
+    <div class="card">
+        <h4 style="margin-bottom:8px">📊 نتائج التصويت</h4>
+        <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
+        <hr class="sep">
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+            <button class="btn-danger btn-sm" onclick="confirmExecution()">تثبيت الإعدام 💀</button>
+            <button class="btn-blue btn-sm" onclick="triggerPanic()">PANIC MODE 🚨</button>
+            <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
         </div>
     </div>
 </div>
@@ -366,41 +386,25 @@ function renderBossSecrets(players){
 //  Clues (Boss Only, Persistent)
 // ════════════════════════════════════════════════
 function addClue(clueObj){
-    const panel=document.getElementById('clues-panel');
-    if(panel.querySelector('p')) panel.innerHTML='';
-    const div=document.createElement('div');
-    div.className='clue-item';
-    div.innerHTML=`<div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div><div class="clue-text">🔍 ${clueObj.text}</div>`;
-    panel.appendChild(div);
-    panel.scrollTop=panel.scrollHeight;
-}
-
-// دالة عرض الدليل بشكل "نظيف" زي الموقع التاني
-socket.on('receiveClue', (clueObj) => {
     const panel = document.getElementById('clues-panel');
-    if(panel.innerHTML.includes('انتظار')) panel.innerHTML = '';
+    // بنشيل كلمة "جاري التوليد" بس في أول مرة
+    if(panel.innerText.includes('جاري') || panel.innerText.includes('انتظار')) panel.innerHTML = '';
     
-    const html = `
-        <div class="clue-item animate__animated animate__fadeInRight">
-            <small style="color:var(--gold)">الجولة ${clueObj.round} • ${clueObj.time}</small>
-            <p style="margin:10px 0; font-size:1.1em;">${clueObj.text}</p>
-            <button onclick="shareClue('${clueObj.text.replace(/'/g, "\\'")}')" 
-                    style="background:#28a745; padding:5px 10px; font-size:12px; width:auto;">
-                نشر الدليل للاعبين 📢
-            </button>
-        </div>
-    `;
-    panel.insertAdjacentHTML('afterbegin', html);
-});
-
-function shareClue(txt) {
-    socket.emit('shareEvidence', { roomCode: myCode, text: txt, type: 'evidence' });
-    showToast("تم نشر الدليل بنجاح", 2000);
-}
-
-function requestClue(){
-    socket.emit('requestPhysicalClue', myCode);
-    showToast('جاري توليد دليل...', 2000);
+    const div = document.createElement('div');
+    div.className = 'clue-item';
+    div.style.borderBottom = "1px solid #333";
+    div.style.paddingBottom = "10px";
+    
+    // تأكد إن علامات الاقتباس مظبوطة عشان الزرار يشتغل
+    div.innerHTML = `
+        <div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div>
+        <div class="clue-text">🔍 ${clueObj.text}</div>
+        <button style="background:#28a745; color:white; width:auto; padding:5px 12px; font-size:12px; margin-top:5px; border-radius:5px;" 
+                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${clueObj.text.replace(/'/g, "\\'")}', type:'evidence'})">
+            📢 إرسال للاعبين
+        </button>`;
+    
+    panel.prepend(div); // بنحط الدليل الجديد فوق القديم
 }
 
 // ════════════════════════════════════════════════
@@ -542,14 +546,52 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
-socket.on('panicTwist', (twist)=>{
-    const card=document.getElementById('twistCard');
-    const txt=document.getElementById('twistText');
-    card.style.display='block';
-    txt.textContent=twist;
-    showToast('🌀 Plot Twist تم توليده!', 3000);
-});
+ssocket.on('panicTwist', (twist) => {
+    const card = document.getElementById('twistCard');
+    const txt = document.getElementById('twistText');
+    card.style.display = 'block';
 
+    // ✅ كل مرة نضيف الـ twist الجديد فوق القديم بدل ما نمسحه
+    const entry = document.createElement('div');
+    entry.style.cssText = 'border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:10px;';
+    const safeText = twist.replace(/'/g, "\\'").replace(/\n/g, ' ');
+    entry.innerHTML = `
+        <p style="margin-bottom:8px; color:#ffb3b3; font-style:italic;">${twist}</p>
+        <button style="background:#dc3545; color:white; width:auto; padding:8px 16px; font-size:13px; border-radius:6px;" 
+                onclick="socket.emit('shareEvidence', {roomCode:myCode, text:'${safeText}', type:'twist'})">
+            📢 إرسال للكل
+        </button>`;
+    txt.prepend(entry); // ✅ الجديد فوق القديم
+    showToast('🌀 Plot Twist جديد جاهز!', 2500);
+});
+// ════════════════════════════════════════════════
+//  استقبال الدليل أو الحدث المبعوت من البوس
+// ════════════════════════════════════════════════
+socket.on('receiveEvidence', (data) => {
+    const isEvidence = data.type === 'evidence';
+    const title = isEvidence ? '🔍 دليل جديد من البوس' : '🌀 حدث مفاجئ!';
+    const color = isEvidence ? '#7fff7f' : '#ff6b6b';
+
+    // إظهار إشعار بارز فوق الشاشة
+    let notif = document.getElementById('evidence-notif');
+    if (!notif) {
+        notif = document.createElement('div');
+        notif.id = 'evidence-notif';
+        notif.style.cssText = `
+            position:fixed; top:50px; left:50%; transform:translateX(-50%);
+            background:#111; border:2px solid ${color}; color:#fff;
+            padding:16px 20px; border-radius:12px; z-index:8500;
+            max-width:90%; text-align:center; font-size:15px;
+            box-shadow: 0 0 20px ${color}44;
+        `;
+        document.body.appendChild(notif);
+    }
+    notif.style.borderColor = color;
+    notif.innerHTML = `<b style="color:${color}">${title}</b><br><br>${data.text}<br><br>
+        <button onclick="document.getElementById('evidence-notif').style.display='none'" 
+                style="width:auto;padding:6px 20px;font-size:13px">حسناً ✓</button>`;
+    notif.style.display = 'block';
+});
 // ════════════════════════════════════════════════
 //  Execution Result
 // ════════════════════════════════════════════════
@@ -614,27 +656,44 @@ let localStream;
 let peers = {};
 const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-// 1. تشغيل المايك
+// 1. الدالة اللي بتشغل المايك (اللي كنت بتدور عليها)
 async function initVoiceChat() {
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // إعدادات الصوت عشان يشتغل على السماعات والايربودز بوضوح
+        const constraints = { 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            } 
+        };
+        
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
         document.getElementById('joinVoiceBtn').style.display = 'none';
         document.getElementById('muteBtn').style.display = 'inline-block';
-        socket.emit('joinVoice', myCode);
-        alert("المايك شغال! اتكلم مع زمايلك");
+        
+        // إرسال إشارة للسيرفر إننا دخلنا Voice
+        if (typeof myCode !== 'undefined' && myCode) {
+            socket.emit('joinVoice', myCode);
+        }
+        console.log("🎙️ المايك اشتغل بنجاح");
     } catch (e) {
-        alert("لازم توافق على استخدام المايك");
+        console.error("خطأ في المايك:", e);
+        alert("يا بطل لازم توافق على صلاحية المايك وتكون فاتح رابط HTTPS");
     }
 }
 
-// 2. كتم/فتح الصوت
+// 2. كتم وفتح الصوت
 function toggleMute() {
-    const track = localStream.getAudioTracks()[0];
-    track.enabled = !track.enabled;
-    document.getElementById('muteBtn').innerText = track.enabled ? "كتم الصوت 🔇" : "فتح الصوت 🔊";
+    if(localStream) {
+        const track = localStream.getAudioTracks()[0];
+        track.enabled = !track.enabled;
+        document.getElementById('muteBtn').innerText = track.enabled ? "كتم 🔇" : "تحدث 🔊";
+        document.getElementById('muteBtn').style.background = track.enabled ? "#ffc107" : "#28a745";
+    }
 }
 
-// 3. الربط بين اللاعبين (Signaling)
+// 3. استقبال اللاعبين الجدد في الصوت
 socket.on('user-joined-voice', (userId) => {
     if (localStream) createPeer(userId, true);
 });
@@ -649,24 +708,35 @@ socket.on('webrtc-offer', async (data) => {
 });
 
 socket.on('webrtc-answer', (data) => {
-    if (peers[data.sender]) peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp));
+    if (peers[data.sender]) {
+        peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp));
+    }
 });
 
 socket.on('webrtc-ice-candidate', (data) => {
-    if (peers[data.sender]) peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
+    if (peers[data.sender]) {
+        peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
 });
 
+// 4. دالة الربط التقني بين الموبايلات
 function createPeer(targetId, initiator) {
     const peer = new RTCPeerConnection(rtcConfig);
     peers[targetId] = peer;
+    
     localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
+    
     peer.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
+    
     peer.ontrack = e => {
         let aud = document.createElement('audio');
         aud.autoplay = true;
         aud.srcObject = e.streams[0];
+        // محاولة تشغيل الصوت إجبارياً للسماعات
+        aud.play().catch(() => console.log("محتاج تفاعل من المستخدم لتشغيل الصوت"));
         document.getElementById('audioPlayers').appendChild(aud);
     };
+    
     if (initiator) {
         peer.createOffer().then(o => {
             peer.setLocalDescription(o);
@@ -721,24 +791,74 @@ socket.on('error', (msg) => {
         window.location.href = window.location.origin;
     }
 });
+
+socket.on('receiveEvidence', (data) => {
+    // 1. تشغيل الصوت حسب النوع
+    if(data.type === 'evidence') {
+        document.getElementById('evidencePop').play().catch(e => {});
+    } else {
+        document.getElementById('twistPop').play().catch(e => {});
+    }
+
+    // 2. إظهار الدليل في مودال أو تنبيه شيك
+    // أنا هستخدم SweetAlert لو إنت منزله، أو تنبيه عادي
+    const title = data.type === 'evidence' ? "🔍 دليل جديد ظهر!" : "🚨 تحول مفاجئ في الأحداث!";
+    
+    // إظهار الرسالة بأسلوب سينمائي
+    showInGameNotification(title, data.text);
+    
+    // لو عاوز المتحدث الآلي ينطقها برضه (اختياري)
+    if(typeof speakText === 'function') speakText(data.text);
+});
+
+function showInGameNotification(title, msg) {
+    // كود بسيط لإظهار رسالة فوق اللعبة
+    const notifyDiv = document.createElement('div');
+    notifyDiv.style = "position:fixed; top:20%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.9); color:gold; padding:20px; border:2px solid gold; z-index:20000; text-align:center; width:80%; border-radius:15px; box-shadow:0 0 20px gold;";
+    notifyDiv.innerHTML = `<h3>${title}</h3><p style="color:white;">${msg}</p><button onclick="this.parentElement.remove()" style="background:gold; color:black; width:auto; padding:5px 15px;">فهمت</button>`;
+    document.body.appendChild(notifyDiv);
+    
+    // تختفي لوحدها بعد 10 ثواني لو اللاعب مقفلهاش
+    setTimeout(() => { if(notifyDiv) notifyDiv.remove(); }, 10000);
+}
+
+// الكود اللي بيخلي اللاعب يستقبل "النشر" اللي البوس عمله
+socket.on('receiveEvidence', (data) => {
+    // تشغيل الصوت (تأكد إنك ضفت وسوم الـ audio اللي بعتهالك فوق)
+    const sound = data.type === 'evidence' ? document.getElementById('evidencePop') : document.getElementById('twistPop');
+    if(sound) sound.play().catch(e => console.log("الصوت محظور"));
+
+    // إظهار الرسالة للاعب
+    const title = data.type === 'evidence' ? "🔍 دليل جديد!" : "🚨 تحول مفاجئ!";
+    showInGameNotification(title, data.text);
+});
 </script>
-<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(17, 17, 17, 0.95); padding:15px 10px 30px 10px; border-top:2px solid #d4af37; z-index:9999; text-align:center; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
+<style>
+    /* بنخلي الصفحة تسيب مسافة تحت عشان الشريط ما يغطيش على آخر زراير */
+    body { padding-bottom: 120px !important; } 
+    .boss-controls { margin-bottom: 20px; }
+
+    #voiceChatBar { z-index: 99999 !important; display: block !important; }
+    #voiceChatBar { display: flex !important; z-index: 999999 !important; visibility: visible !important; }
+</style>
+
+<div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">
     
-    <span style="color:gold; font-weight:bold; margin-left:15px; vertical-align: middle;">🎙️ إدارة الحوار:</span>
+    <span style="color:gold; font-weight:bold; margin-right:10px;">🎙️ إدارة الحوار:</span>
     
-    <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
-        تشغيل المايك
-    </button>
+    <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; padding:8px 20px; font-size:13px; font-weight:bold;">تشغيل المايك</button>
     
-    <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
-        كتم 🔇
-    </button>
+    <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; border:none; border-radius:5px; padding:8px 20px; font-size:13px; font-weight:bold;">كتم 🔇</button>
 
     <div id="audioPlayers" style="display:none;"></div>
 
-    <div style="position: absolute; bottom: 5px; right: 15px; font-size: 11px; color: rgba(212, 175, 55, 0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; pointer-events: none;">
-        Developed by <span style="font-weight: bold; color: gold; text-shadow: 1px 1px 2px black;">Mahmoud Geraba</span>
+    <div style="position: absolute; bottom: 5px; right: 10px; font-size: 10px; color: rgba(212, 175, 55, 0.5); pointer-events: none;">
+        Dev: <span style="color: gold;">Mahmoud Geraba</span>
     </div>
 </div>
+
+<audio id="evidencePop" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+<audio id="twistPop" src="https://actions.google.com/sounds/v1/horror/ambient_hum_short.ogg" preload="auto"></audio>
+
 </body>
 </html>

@@ -1,4 +1,3 @@
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -359,35 +358,30 @@ io.on('connection', (socket) => {
         io.to(room.boss).emit('receiveClue', clueObj);
     }
 
-    socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
-// طلب دليل جديد
-    socket.on('requestClue', async (roomCode) => {
-        const room = rooms[roomCode];
-        if(room) {
-            // نبعت "Loading" للبوس الأول
-            io.to(room.boss).emit('clueLoading');
-            await sendClue(roomCode);
-        }
-    });
     
-    // ── Panic Mode — حدث مفاجئ + تأثير بصري ────────────────────
-    socket.on('triggerPanic', async (roomCode) => {
-        const room = rooms[roomCode];
-        // نبعت التأثير البصري/الصوتي فوراً للكل
-        io.to(roomCode).emit('panicAction');
 
-        // نولد Plot Twist من AI للبوس
-        if (room?.scenario) {
-            const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. 
-اللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.
-اكتب حدثاً مفاجئاً (Plot Twist) درامياً ومثيراً يغير مجرى التحقيق تماماً. 
-جملتان أو ثلاث بالعربية، مثيرة ومشوقة.`;
-            const twist = await getAIResponse(prompt);
-            if (twist) {
-                io.to(room.boss).emit('panicTwist', twist);
-            }
+   // ── Panic Mode — حدث مفاجئ + تأثير بصري (تعديل محمود جربا) ────────────────────
+socket.on('triggerPanic', async (roomCode) => {
+    const room = rooms[roomCode];
+    if (!room) return;
+
+    // 1. نبعت التأثير البصري (الرعشة والصوت) فوراً للكل عشان الكل يقلق
+    io.to(roomCode).emit('panicAction');
+
+    // 2. نولد الـ Plot Twist من AI ونبعته "للبوس فقط" سرّاً
+    if (room.scenario) {
+        const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. 
+        اللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.
+        اكتب حدثاً مفاجئاً (Plot Twist) درامياً ومثيراً يغير مجرى التحقيق تماماً. 
+        جملتان أو ثلاث باللهجة المصرية، مثيرة ومشوقة جداً.`;
+
+        const twist = await getAIResponse(prompt);
+        if (twist) {
+            // بنبعتها للبوس لوحده عشان يظهر عنده زرار "إرسال للكل" اللي ضفناه في الـ HTML
+            io.to(room.boss).emit('panicTwist', twist);
         }
-    });
+    }
+});
 
     // ── التصويت ─────────────────────────────────────────────────
     socket.on('castVote', (data) => {
@@ -491,7 +485,22 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         // مش بنحذف اللاعب — بنديه فرصة يرجع
     });
+// إرسال دليل محدد من البوس للاعبين
+    // إرسال دليل محدد من البوس للاعبين (تعديل محمود جرابه)
+    socket.on('shareEvidence', (data) => {
+        if (data.roomCode) {
+            io.in(data.roomCode).emit('receiveEvidence', {
+                text: data.text,
+                type: data.type
+            });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        // مش بنحذف اللاعب — بنديه فرصة يرجع
+    });
 });
+
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
