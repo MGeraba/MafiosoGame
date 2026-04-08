@@ -72,9 +72,6 @@
         .btn-blue{background:#17a2b8!important;color:#fff!important}
         .btn-gray{background:#444!important;color:#fff!important}
         .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
-
-
-        #voiceChatBar { z-index: 99999 !important; display: block !important; }
     </style>
 </head>
 <body>
@@ -680,6 +677,9 @@ function createPeer(targetId, initiator) {
     return peer;
 }
 
+// 4. إظهار شريط الصوت في الوقت المناسب
+socket.on('roomCreated', () => document.getElementById('voiceChatBar').style.display = 'block');
+socket.on('joinedSuccess', () => document.getElementById('voiceChatBar').style.display = 'block');
 
 // ════════════════════════════════════════════════
 //  Helpers
@@ -696,32 +696,35 @@ function showToast(msg, dur=3000){
     clearTimeout(t._t);
     t._t=setTimeout(()=>{ t.style.display='none'; }, dur);
 }
+
 // 1. عند انتهاء اللعبة بفوز فريق (المافيا أو المواطنين)
 socket.on('gameOver', (msg) => {
     alert("🎮 " + msg);
-    SS.clear(); // التعديل هنا
+    // تنظيف الذاكرة تماماً
+    localStorage.removeItem('mafia_sess'); 
+    // العودة للصفحة الرئيسية "نضيفة" بدون كود قديم
     window.location.href = window.location.origin; 
 });
 
 // 2. في حالة إن "البوس" قفل الغرفة أو السيرفر فصل
 socket.on('roomEnded', () => {
     alert("⚠️ انتهت الجلسة أو تم إغلاق الغرفة من قبل المضيف.");
-    SS.clear(); // التعديل هنا
+    localStorage.removeItem('mafia_sess');
     window.location.href = window.location.origin;
 });
 
 // 3. في حالة حدوث خطأ عام (زي كود غلط أو غرفة مش موجودة)
 socket.on('error', (msg) => {
     alert("❌ خطأ: " + msg);
+    // لو الخطأ متعلق بالغرفة، نضف الذاكرة برضه
     if(msg.includes("انتهت") || msg.includes("غير موجودة")) {
-        SS.clear(); // التعديل هنا
+        localStorage.removeItem('mafia_sess');
         window.location.href = window.location.origin;
     }
 });
-
-
 </script>
-<div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">    
+<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(17, 17, 17, 0.95); padding:15px 10px 30px 10px; border-top:2px solid #d4af37; z-index:9999; text-align:center; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
+    
     <span style="color:gold; font-weight:bold; margin-left:15px; vertical-align: middle;">🎙️ إدارة الحوار:</span>
     
     <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">

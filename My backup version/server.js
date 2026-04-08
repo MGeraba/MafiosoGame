@@ -19,12 +19,13 @@ const io = new Server(server, {
 // ════════════════════════════════════════════════
 const GEMINI_KEYS = [
     process.env.GEMINI_KEY,
-    
+    process.env.GEMINI_KEY_2,
+    process.env.GEMINI_KEY_3,
 ].filter(Boolean);
 
 const GROQ_KEYS = [
     process.env.GROQ_KEY,
-    
+    process.env.GROQ_KEY_2,
 ].filter(Boolean);
 
 let geminiIndex = 0, groqIndex = 0;
@@ -183,13 +184,6 @@ io.on('connection', (socket) => {
         const room = rooms[roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
         if (room.bossToken !== bossToken) { socket.emit('error', 'غير مصرح'); return; }
-        
-        // التعديل هنا: نلغي المؤقت لو البوس رجع للغرفة
-        if (room.deleteTimer) {
-            clearTimeout(room.deleteTimer);
-            room.deleteTimer = null;
-        }
-
         room.boss = socket.id;
         socket.join(roomCode);
         socket.emit('bossReconnected', {
@@ -284,14 +278,11 @@ io.on('connection', (socket) => {
         }
 
         let scenario;
-        // التعديل هنا: تنظيف النص من علامات الماركداون قبل التحليل
-        let cleanedResponse = response.replace(/```json/gi, '').replace(/```/g, '').trim();
-
         try { 
-            scenario = JSON.parse(cleanedResponse); 
+            scenario = JSON.parse(response); 
         } catch (e) {
             // محاولة استخراج JSON من النص
-            const match = cleanedResponse.match(/\{[\s\S]*\}/);
+            const match = response.match(/\{[\s\S]*\}/);
             if (match) { 
                 try { 
                     scenario = JSON.parse(match[0]); 
@@ -402,7 +393,8 @@ io.on('connection', (socket) => {
             details: counts
         });
     });
-// ── تنفيذ الإعدام ────────────────────────────────────────────
+
+    // ── تنفيذ الإعدام ────────────────────────────────────────────
     socket.on('executePlayer', (roomCode) => {
         const room = rooms[roomCode];
         if (!room) return;
@@ -411,12 +403,6 @@ io.on('connection', (socket) => {
         Object.values(room.votes).forEach(v => counts[v] = (counts[v] || 0) + 1);
         const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
         if (!sorted.length) { io.to(room.boss).emit('error', 'مفيش تصويت لسه!'); return; }
-
-        // التعديل هنا: فحص التعادل
-        if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) {
-            io.to(room.boss).emit('error', 'في تعادل في التصويت! خلّي اللاعبين يتناقشوا وصوّتوا تاني.');
-            return; // وقف التنفيذ هنا
-        }
 
         const kickedChar = sorted[0][0];
         const p = room.players.find(pl => pl.charName === kickedChar);
@@ -495,22 +481,9 @@ io.on('connection', (socket) => {
         io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
     });
     socket.on('disconnect', () => {
-        for (const roomCode in rooms) {
-            const room = rooms[roomCode];
-            // لو اللي فصل هو البوس، نعمل مؤقت 10 دقايق يمسح الغرفة
-            if (room.boss === socket.id) {
-                room.deleteTimer = setTimeout(() => {
-                    if (rooms[roomCode]) {
-                        io.to(roomCode).emit('roomEnded');
-                        delete rooms[roomCode];
-                        console.log(`Room ${roomCode} deleted due to boss inactivity.`);
-                    }
-                }, 10 * 60 * 1000); // 10 دقائق
-                break;
-            }
-        }
+        // مش بنحذف اللاعب — بنديه فرصة يرجع
     });
-    });
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
