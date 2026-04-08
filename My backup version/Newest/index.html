@@ -83,18 +83,16 @@ body {
 
 /* ── إخفاء وإظهار الدور (العين) ── */
 .role-hidden {
-    color: transparent !important;
-    background-color: #333 !important;
-    text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
-    border-color: #555 !important;
+    filter: blur(8px);
     cursor: pointer;
     user-select: none;
-    transition: all 0.3s ease;
+    transition: filter 0.3s ease;
 }
 .role-visible {
+    filter: blur(0);
     cursor: pointer;
     user-select: none;
-    transition: all 0.3s ease;
+    transition: filter 0.3s ease;
 }
 .role-container {
     display: inline-flex;
@@ -462,22 +460,6 @@ socket.on('clueShared', (clueObj) => {
         }
     }
 });
-// استقبال اللاعبين للحدث المفاجئ (التويست)
-socket.on('twistShared', (twist) => {
-    if(!isBoss) {
-        const cluesContainer = document.getElementById('playerClues');
-        const list = document.getElementById('playerCluesList');
-        if(cluesContainer && list) {
-            cluesContainer.style.display = 'block';
-            list.innerHTML += `
-            <div style="border-bottom:1px dashed #ff6b6b; padding-bottom:8px; margin-bottom:8px; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px;">
-                <span style="font-size:0.85em; color:#ff6b6b; font-weight:bold;">🚨 حدث مفاجئ (Plot Twist):</span><br>
-                <span style="color:#ffb3b3; font-size:1em; font-style:italic;">${twist}</span>
-            </div>`;
-            showToast('🚨 البوس أرسل حدثاً مفاجئاً، انتبه!', 5000);
-        }
-    }
-});
 
 socket.on('receiveClue', (clueObj)=>{
     addClue(clueObj);
@@ -652,29 +634,13 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
-// Plot Twist يوصل للبوس فقط ومعه زر الإرسال
 socket.on('panicTwist', (twist)=>{
     const card=document.getElementById('twistCard');
     const txt=document.getElementById('twistText');
     card.style.display='block';
-    
-    // تنظيف النص من علامات الاقتباس اللي ممكن تبوظ الكود
-    const safeTwist = twist.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-
-    txt.innerHTML = `
-        <span style="font-size:1.1em">${twist}</span><br>
-        <button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist('${safeTwist}')">إرسال التويست للاعبين 📢</button>
-    `;
+    txt.textContent=twist;
     showToast('🌀 Plot Twist تم توليده!', 3000);
 });
-
-// دالة إرسال التويست
-function sharePlotTwist(twistText) {
-    socket.emit('shareTwist', { roomCode: myCode, twist: twistText });
-    document.getElementById('shareTwistBtn').disabled = true;
-    document.getElementById('shareTwistBtn').textContent = 'تم الإرسال ✔️';
-    showToast('✅ تم إرسال الحدث المفاجئ للاعبين!', 3000);
-}
 
 // ════════════════════════════════════════════════
 //  Execution Result

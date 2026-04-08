@@ -396,11 +396,6 @@ io.on('connection', (socket) => {
         }
     });
 
-// ── إرسال البوس التويست للاعبين ─────────────────────────────
-    socket.on('shareTwist', (data) => {
-        io.to(data.roomCode).emit('twistShared', data.twist);
-    });
-    
     // ── التصويت ─────────────────────────────────────────────────
     socket.on('castVote', (data) => {
         const room = rooms[data.roomCode];
