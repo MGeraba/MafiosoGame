@@ -75,6 +75,37 @@
 
 
         #voiceChatBar { z-index: 99999 !important; display: block !important; }
+
+        /* ── حل مشكلة الشريط السفلي ── */
+body {
+    padding-bottom: 100px !important; /* مساحة كافية تحت عشان الشريط ميغطيش حاجة */
+}
+
+/* ── إخفاء وإظهار الدور (العين) ── */
+.role-hidden {
+    filter: blur(8px);
+    cursor: pointer;
+    user-select: none;
+    transition: filter 0.3s ease;
+}
+.role-visible {
+    filter: blur(0);
+    cursor: pointer;
+    user-select: none;
+    transition: filter 0.3s ease;
+}
+.role-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+    background: #1a1a1a;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px dashed #555;
+}
+
     </style>
 </head>
 <body>
@@ -389,13 +420,46 @@ function renderBossSecrets(players){
 // ════════════════════════════════════════════════
 function addClue(clueObj){
     const panel=document.getElementById('clues-panel');
-    if(panel.querySelector('p')) panel.innerHTML='';
+    if(panel.querySelector('p')) panel.innerHTML=''; // مسح كلمة "جاري التوليد"
+    
     const div=document.createElement('div');
     div.className='clue-item';
     div.innerHTML=`<div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div><div class="clue-text">🔍 ${clueObj.text}</div>`;
+    
+    // إضافة زر الإرسال لو اللي فاتح هو البوس
+    if(isBoss) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-gray btn-sm';
+        btn.style.marginTop = '8px';
+        btn.textContent = 'إرسال للاعبين 📢';
+        btn.onclick = () => {
+            socket.emit('shareClue', { roomCode: myCode, clue: clueObj });
+            showToast('✅ تم إرسال الدليل للاعبين!', 3000);
+            btn.disabled = true;
+            btn.textContent = 'تم الإرسال ✔️';
+        };
+        div.appendChild(btn);
+    }
+    
     panel.appendChild(div);
     panel.scrollTop=panel.scrollHeight;
 }
+
+// استقبال اللاعبين للدليل من البوس
+socket.on('clueShared', (clueObj) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += `<div style="border-bottom:1px solid #2d6a2d; padding-bottom:5px; margin-bottom:5px;">
+                <span style="font-size:0.7em; color:#888;">جولة ${clueObj.round}:</span> 
+                <span style="color:#7fff7f; font-size:0.95em;">${clueObj.text}</span>
+            </div>`;
+            showToast('📢 البوس أرسل دليلاً جديداً، اقرأه الآن!', 5000);
+        }
+    }
+});
 
 socket.on('receiveClue', (clueObj)=>{
     addClue(clueObj);
@@ -423,11 +487,23 @@ function restorePlayerScreen(d, alreadyVoted, isAlive){
         <div class="card">
             <h2 style="color:#d4af37;margin-bottom:6px">${d.charName}</h2>
             <div class="story-box">${d.story}</div>
+            
             <div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
                 <span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span>
                 <p style="color:#00ffcc;margin-top:4px">${d.charSecret}</p>
             </div>
-            <div class="${isMafia?'badge-mafia':'badge-civ'}" style="font-size:1.4em;margin-top:6px">${d.role}</div>
+            
+            <p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>
+            <div class="role-container" onclick="toggleRole()">
+                <span style="font-size: 1.8em;">👁️</span>
+                <span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':'badge-civ'}">${d.role}</span>
+            </div>
+            
+            <!-- مكان أدلة البوس لما يبعتها -->
+            <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">
+                <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>
+                <div id="playerCluesList"></div>
+            </div>
         </div>`;
 
     const ghostDiv=document.getElementById('ghostNotice');
@@ -442,6 +518,18 @@ function restorePlayerScreen(d, alreadyVoted, isAlive){
         } else {
             renderVoteButtons(d.allCharNames, false);
         }
+    }
+}
+
+// دالة تشغيل العين
+function toggleRole() {
+    const roleSpan = document.getElementById('mySecretRole');
+    if(roleSpan.classList.contains('role-hidden')) {
+        roleSpan.classList.remove('role-hidden');
+        roleSpan.classList.add('role-visible');
+    } else {
+        roleSpan.classList.add('role-hidden');
+        roleSpan.classList.remove('role-visible');
     }
 }
 

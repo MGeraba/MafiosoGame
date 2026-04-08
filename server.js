@@ -352,10 +352,10 @@ io.on('connection', (socket) => {
         const prevClues = room.clues.map(c => c.text).join(' | ');
         const prompt = `في لعبة المافيا هذه:
 القصة: ${room.scenario.story}
-المافيا (سري): ${mafiaChars}
+المافيا (سري جداً): ${mafiaChars}
 الأدلة السابقة: ${prevClues || "لا يوجد"}
-أعطني دليلاً مادياً غامضاً جديداً يلمح لأحد المافيا في الجولة ${room.round} دون أن يكشفه مباشرة. جملة واحدة فقط باللهجة المصرية.`;
-
+أعطني دليلاً مادياً غامضاً جديداً يلمح لأحد المافيا في الجولة ${room.round}.
+تحذير هام جداً: يجب أن يكون الدليل غامضاً ومحيراً ولا يكشف الاسم أو الهوية بشكل صريح أو مباشر أبداً. اكتبه في جملة واحدة فقط باللهجة المصرية بحيث يثير الشكوك ويحتمل أكثر من شخصية.`;
         const clue = await getAIResponse(prompt);
         if (!clue) return;
 
@@ -370,6 +370,12 @@ io.on('connection', (socket) => {
     }
 
     socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
+
+    // ── إرسال البوس الدليل للاعبين ─────────────────────────────
+    socket.on('shareClue', (data) => {
+        // نبعت الدليل لكل اللي في الغرفة (عشان يظهر عند اللاعبين)
+        io.to(data.roomCode).emit('clueShared', data.clue);
+    });
 
     // ── Panic Mode — حدث مفاجئ + تأثير بصري ────────────────────
     socket.on('triggerPanic', async (roomCode) => {
