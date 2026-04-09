@@ -4,7 +4,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const classicMafia = require('./classicMafia'); // استدعاء ملف الكلاسيك
-
+const classicMafia = require('./classicMafia');
+const spyGame = require('./spyGame'); // إضااافة ملف الجاسوس
 const app = express();
 const server = http.createServer(app);
 
@@ -227,11 +228,17 @@ io.on('connection', (socket) => {
         const room = rooms[data.roomCode];
         if (!room || room.players.length === 0) return;
         
-        // لو البوس اختار الوضع الكلاسيكي
         if (data.mode === 'classic') {
             room.started = true;
             classicMafia.startGame(io, room, data.roomCode);
-            return; // نوقف هنا عشان ميكملش لذكاء الاصطناعي
+            return;
+        }
+
+        if (data.mode === 'spy') {
+            room.started = true;
+            // نمرر دالة getAIResponse عشان ملف الجاسوس يقدر يستخدم الذكاء الاصطناعي بتاعنا
+            spyGame.startGame(io, room, data.roomCode, data, getAIResponse);
+            return;
         }
 
         // --- باقي كود الذكاء الاصطناعي للمافيوسو كما هو أسفل هذا السطر ---
@@ -551,7 +558,28 @@ io.on('connection', (socket) => {
             classicMafia.handleDoctorSave(io, room, data.roomCode, data.target);
         }
     });
+// ── أحداث لعبة الجاسوس ─────────────────────────────────────
+    socket.on('startSpyVoting', (roomCode) => {
+        const room = rooms[roomCode];
+        if (room && room.mode === 'spy') {
+            spyGame.startVoting(io, room, roomCode);
+        }
+    });
 
+    socket.on('castSpyVote', (data) => {
+        const room = rooms[data.roomCode];
+        if (room && room.mode === 'spy') {
+            spyGame.handleVote(io, room, data.roomCode, socket.id, data.votedForChar);
+        }
+    });
+
+    socket.on('submitSpyGuess', (data) => {
+        const room = rooms[data.roomCode];
+        if (room && room.mode === 'spy') {
+            spyGame.handleSpyGuess(io, room, data.roomCode, data.guess);
+        }
+    });
+    
     socket.on('disconnect', () => {
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
