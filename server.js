@@ -102,58 +102,17 @@ function checkWinCondition(room) {
     const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
     const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
 
-    // المافيا كسبت لو عددهم >= المواطنين
-    if (aliveMafia.length >= aliveCivilians.length) {
+    // المواطنون يخسرون فقط إذا ماتوا جميعاً
+    if (aliveCivilians.length === 0) {
         return { over: true, winner: 'mafia', aliveMafia, aliveCivilians };
     }
-    // المواطنون كسبوا لو مفيش مافيا
+    // المافيا تخسر فقط إذا ماتوا جميعاً
     if (aliveMafia.length === 0) {
         return { over: true, winner: 'civilians', aliveMafia, aliveCivilians };
     }
     return { over: false, aliveMafia, aliveCivilians };
 }
 
-// إرسال قائمة التصويت لكل لاعب حي
-function broadcastVoteLists(room) {
-    const alivePlayers = room.players.filter(p => p.alive);
-    const deadCivilians = room.players.filter(p => !p.alive && !p.role.includes('🔪'));
-    const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
-    const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
-
-    // حالة خاصة: مافيا واحد ومواطن واحد — المواطنون الميتون يصوتون
-    const specialCase = aliveMafia.length === 1 && aliveCivilians.length === 1;
-
-    if (specialCase) {
-        // المواطنون الميتون يصوتون على الاثنين الباقيين
-        const targets = alivePlayers.map(p => p.charName);
-        deadCivilians.forEach(p => {
-            io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: true });
-        });
-        // اللاعبان الحيان لا يصوتون
-        alivePlayers.forEach(p => {
-            io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false });
-        });
-    } else {
-        // الحالة العادية: كل لاعب حي يصوت على غيره (بدون نفسه)
-        alivePlayers.forEach(p => {
-            const targets = alivePlayers
-                .filter(other => other.name !== p.name)
-                .map(other => other.charName);
-            io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: false });
-        });
-        // المواطنون الميتون لا يصوتون في الحالة العادية
-        deadCivilians.forEach(p => {
-            io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false });
-        });
-    }
-
-    // البوس يشوف كل الأحياء
-    io.to(room.boss).emit('nextRound', {
-        chars: alivePlayers.map(p => p.charName),
-        canVote: false,
-        isGhost: false
-    });
-}
 
 // ════════════════════════════════════════════════
 //  Socket Events
@@ -355,18 +314,24 @@ io.on('connection', (socket) => {
 المافيا (سري جداً): ${mafiaChars}
 الأدلة السابقة: ${prevClues || "لا يوجد"}
 أعطني دليلاً مادياً غامضاً جديداً يلمح لأحد المافيا في الجولة ${room.round}.
-تحذير هام جداً: يجب أن يكون الدليل غامضاً ومحيراً ولا يكشف الاسم أو الهوية بشكل صريح أو مباشر أبداً. اكتبه في جملة واحدة فقط باللهجة المصرية بحيث يثير الشكوك ويحتمل أكثر من شخصية.`;
-        const clue = await getAIResponse(prompt);
-        if (!clue) return;
+الرد يجب أن يكون JSON فقط بهذا الشكل: {"clue": "نص الدليل هنا"}`;
+        
+        const response = await getAIResponse(prompt);
+        if (!response) return;
 
-        const clueObj = {
-            text: clue,
-            round: room.round,
-            time: new Date().toLocaleTimeString('ar-EG')
-        };
-        room.clues.push(clueObj);
-        // الدليل للبوس فقط
-        io.to(room.boss).emit('receiveClue', clueObj);
+        try {
+            let cleaned = response.replace(/```json/gi, '').replace(/```/g, '').trim();
+            let parsed = JSON.parse(cleaned);
+            const clueObj = {
+                text: parsed.clue || parsed,
+                round: room.round,
+                time: new Date().toLocaleTimeString('ar-EG')
+            };
+            room.clues.push(clueObj);
+            io.to(room.boss).emit('receiveClue', clueObj);
+        } catch (e) {
+            console.error("Clue parse error");
+        }
     }
 
     socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
@@ -380,18 +345,23 @@ io.on('connection', (socket) => {
     // ── Panic Mode — حدث مفاجئ + تأثير بصري ────────────────────
     socket.on('triggerPanic', async (roomCode) => {
         const room = rooms[roomCode];
-        // نبعت التأثير البصري/الصوتي فوراً للكل
         io.to(roomCode).emit('panicAction');
 
-        // نولد Plot Twist من AI للبوس
         if (room?.scenario) {
             const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. 
 اللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.
-اكتب حدثاً مفاجئاً (Plot Twist) درامياً ومثيراً يغير مجرى التحقيق تماماً. 
-جملتان أو ثلاث بالعربية، مثيرة ومشوقة.`;
-            const twist = await getAIResponse(prompt);
-            if (twist) {
-                io.to(room.boss).emit('panicTwist', twist);
+اكتب حدثاً مفاجئاً (Plot Twist) يغير مجرى التحقيق.
+الرد يجب أن يكون JSON فقط بهذا الشكل: {"twist": "نص التويست هنا"}`;
+            
+            const response = await getAIResponse(prompt);
+            if (response) {
+                try {
+                    let cleaned = response.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    let parsed = JSON.parse(cleaned);
+                    io.to(room.boss).emit('panicTwist', parsed.twist || parsed);
+                } catch(e) {
+                    console.error("Twist parse error");
+                }
             }
         }
     });
@@ -400,7 +370,45 @@ io.on('connection', (socket) => {
     socket.on('shareTwist', (data) => {
         io.to(data.roomCode).emit('twistShared', data.twist);
     });
-    
+    // ── بدء مرحلة التصويت (من البوس) ─────────────────────────────
+    socket.on('startVotingPhase', (roomCode) => {
+        const room = rooms[roomCode];
+        if (!room) return;
+
+        const alivePlayers = room.players.filter(p => p.alive);
+        const deadCivilians = room.players.filter(p => !p.alive && !p.role.includes('🔪'));
+        const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
+        const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
+
+        // حالة خاصة: 1 مافيا و 1 مواطن
+        const specialCase = aliveMafia.length === 1 && aliveCivilians.length === 1 && alivePlayers.length === 2;
+
+        if (specialCase) {
+            const targets = alivePlayers.map(p => p.charName);
+            // المواطنون الميتون فقط هم من يصوتون
+            deadCivilians.forEach(p => {
+                io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: true });
+            });
+            // الأحياء لا يصوتون
+            alivePlayers.forEach(p => {
+                io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false });
+            });
+        } else {
+            // الحالة العادية: الأحياء يصوتون
+            alivePlayers.forEach(p => {
+                const targets = alivePlayers.filter(other => other.name !== p.name).map(other => other.charName);
+                io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: false });
+            });
+            // الميتون لا يصوتون
+            room.players.filter(p => !p.alive).forEach(p => {
+                io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true });
+            });
+        }
+        
+        // إبلاغ البوس أن التصويت بدأ
+        io.to(room.boss).emit('votingStarted');
+    });
+
     // ── التصويت ─────────────────────────────────────────────────
     socket.on('castVote', (data) => {
         const room = rooms[data.roomCode];
@@ -468,10 +476,8 @@ io.on('connection', (socket) => {
         } else {
             room.round++;
             room.votes = {};
-            // دليل جديد في بداية الجولة الجديدة
+            // نرسل دليل جديد فقط، ولا نرسل قوائم التصويت!
             sendClue(roomCode);
-            // إرسال قوائم التصويت
-            setTimeout(() => broadcastVoteLists(room), 1000);
         }
     });
 

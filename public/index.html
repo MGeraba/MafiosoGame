@@ -217,6 +217,7 @@ body {
         <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
         <hr class="sep">
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+            <button class="btn-green btn-sm" id="btnStartVote" onclick="startVotingPhase()">بدء التصويت 🗳️</button>
             <button class="btn-danger btn-sm" onclick="confirmExecution()">تثبيت الإعدام 💀</button>
             <button class="btn-blue btn-sm" onclick="triggerPanic()">PANIC MODE 🚨</button>
             <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
@@ -721,6 +722,26 @@ function closeRoom(){
     }
 }
 
+function startVotingPhase() {
+    socket.emit('startVotingPhase', myCode);
+    document.getElementById('btnStartVote').disabled = true;
+    document.getElementById('btnStartVote').innerText = "جاري التصويت...";
+}
+
+socket.on('votingStarted', () => {
+    showToast('تم فتح باب التصويت للاعبين!', 3000);
+});
+
+// عشان نرجع الزر لطبيعته بعد الإعدام أو في الجولة الجديدة
+socket.on('executionResult', () => {
+    const btn = document.getElementById('btnStartVote');
+    if(btn) {
+        btn.disabled = false;
+        btn.innerText = "بدء التصويت 🗳️";
+    }
+    document.getElementById('vStats').innerHTML = '<p style="color:#555">لا يوجد أصوات بعد</p>';
+});
+
 // ════════════════════════════════════════════════
 //  Auto-fill code from URL
 // ════════════════════════════════════════════════
@@ -741,15 +762,23 @@ let peers = {};
 const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // 1. تشغيل المايك
+
 async function initVoiceChat() {
+    // التحقق من إن الموقع HTTPS (المايك مش هيشتغل على HTTP)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        alert("⚠️ عذراً، المحادثة الصوتية تتطلب اتصالاً آمناً (HTTPS). تأكد من الرابط الخاص بك.");
+        return;
+    }
+
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         document.getElementById('joinVoiceBtn').style.display = 'none';
         document.getElementById('muteBtn').style.display = 'inline-block';
         socket.emit('joinVoice', myCode);
-        alert("المايك شغال! اتكلم مع زمايلك");
+        showToast("🎙️ المايك شغال! تقدر تتكلم دلوقتي.");
     } catch (e) {
-        alert("لازم توافق على استخدام المايك");
+        console.error(e);
+        alert("❌ المتصفح منع استخدام المايك. الرجاء إعطاء الصلاحية من إعدادات المتصفح (علامة القفل بجوار الرابط).");
     }
 }
 
