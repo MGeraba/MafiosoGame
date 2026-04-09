@@ -107,6 +107,7 @@ body {
     border-radius: 10px;
     border: 1px dashed #555;
 }
+.badge-blue { color: #4da6ff; font-size: 1.3em; font-weight: bold; }
 
     </style>
 </head>
@@ -170,14 +171,14 @@ body {
 
     <div class="card">
         <h3 style="color:#d4af37;margin-bottom:10px">تجهيز الجولة</h3>
-        <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
-        <textarea id="tricks" placeholder="تريكات أو تفاصيل للقصة (اختياري)"></textarea>
-        <hr class="sep">
-        <span class="label">اللاعبون المتصلون:</span>
-        <div id="pList" style="margin:8px 0">انتظار...</div>
-        <p id="pCount" style="color:#888;font-size:.85em"></p>
-        <button id="startBtn" class="btn-green" onclick="startGame()" style="display:none">ابدأ الجيم 🚀</button>
-        <button class="btn-danger" onclick="closeRoom()">إغلاق الغرفة ❌</button>
+        <select id="gameModeSelection" style="background:#222; color:#fff; border:1px solid #d4af37; padding:10px; width:90%; border-radius:8px; margin-bottom:10px;">
+            <option value="mafioso">وضع المافيوسو 🕵️ (مع الذكاء الاصطناعي)</option>
+            <option value="classic">وضع المافيا الأصلي 🔪 (بدون AI)</option>
+        </select>
+        <div id="aiSettingsBox">
+            <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
+            <textarea id="tricks" placeholder="تريكات أو تفاصيل للقصة (اختياري)"></textarea>
+        </div>
     </div>
 </div>
 
@@ -883,7 +884,117 @@ socket.on('error', (msg) => {
         window.location.href = window.location.origin;
     }
 });
+// إخفاء إعدادات الـ AI لو كلاسيك
+document.getElementById('gameModeSelection')?.addEventListener('change', (e) => {
+    document.getElementById('aiSettingsBox').style.display = e.target.value === 'classic' ? 'none' : 'block';
+});
 
+// تعديل دالة startGame
+function startGame(){
+    const btn=document.getElementById('startBtn');
+    btn.textContent='جاري التحميل... ✨';
+    btn.disabled=true;
+    socket.emit('startGame',{
+        roomCode:myCode,
+        mode: document.getElementById('gameModeSelection').value, // إضافة المود هنا
+        crimeType:document.getElementById('crimeType').value,
+        tricks:document.getElementById('tricks').value
+    });
+}
+// استقبال اللاعب لدوره في المافيا الأصلية
+socket.on('classicGameData', (d) => {
+    show('screen-player-game');
+    const isMafia = d.role === 'مافيا 🔪';
+    let colleaguesHtml = '';
+    if (isMafia && d.mafiaColleagues.length > 0) {
+        colleaguesHtml = `<p style="color:#ff4d4d; font-size:0.9em; margin-top:10px;">زملائك في المافيا: ${d.mafiaColleagues.join('، ')}</p>`;
+    }
+
+    document.getElementById('playerContent').innerHTML=`
+        <div class="card">
+            <h2 style="color:#d4af37;margin-bottom:6px">${d.charName}</h2>
+            <p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>
+            <div class="role-container" onclick="toggleRole()">
+                <span style="font-size: 1.8em;">👁️</span>
+                <span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':(d.role==='دكتور 💉'?'badge-blue':'badge-civ')}">${d.role}</span>
+            </div>
+            ${colleaguesHtml}
+            <hr class="sep">
+            <div id="nightActionUI" style="display:none; padding:10px; background:#111; border-radius:8px;"></div>
+        </div>`;
+        
+    document.getElementById('vUI').style.display='none';
+    document.getElementById('ghostNotice').style.display='none';
+});
+
+// المافيا تختار تقتل مين
+socket.on('mafiaNightAction', (data) => {
+    const box = document.getElementById('nightActionUI');
+    box.style.display = 'block';
+    box.innerHTML = '<h3 style="color:#ff4d4d">🔪 من تريد أن تقتل الليلة؟</h3><div id="mafiaBtns"></div>';
+    data.targets.forEach(t => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-danger'; btn.textContent = t;
+        btn.onclick = () => {
+            socket.emit('mafiaSubmitKill', { roomCode: myCode, target: t });
+            box.innerHTML = '<p style="color:#aaa">انتظر باقي زملائك...</p>';
+        };
+        document.getElementById('mafiaBtns').appendChild(btn);
+    });
+    showToast('الليل بدأ! المافيا تستيقظ.', 3000);
+});
+
+// الدكتور يختار يعالج مين
+socket.on('doctorNightAction', (data) => {
+    const box = document.getElementById('nightActionUI');
+    box.style.display = 'block';
+    if (data.isRoundOne) {
+        box.innerHTML = `<h3 style="color:#4da6ff">💉 المافيا اختارت قتل: ${data.target}</h3>
+        <button class="btn-blue" onclick="socket.emit('doctorSubmitSave', {roomCode:'${myCode}', target:'${data.target}'}); document.getElementById('nightActionUI').innerHTML='تم الإنقاذ ✔️';">أنقذ حياته!</button>`;
+    } else {
+        box.innerHTML = '<h3 style="color:#4da6ff">💉 من تتوقع أن المافيا ستقتله؟</h3><div id="docBtns"></div>';
+        data.targets.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-blue'; btn.textContent = t;
+            btn.onclick = () => {
+                socket.emit('doctorSubmitSave', { roomCode: myCode, target: t });
+                box.innerHTML = '<p style="color:#aaa">تم تسجيل توقعك...</p>';
+            };
+            document.getElementById('docBtns').appendChild(btn);
+        });
+    }
+});
+
+// الصباح بعد جرائم الليل
+socket.on('classicMorningNews', (msg) => {
+    document.getElementById('nightActionUI').style.display = 'none';
+    const overlay = document.getElementById('resultOverlay');
+    document.getElementById('resultIcon').textContent = '🌅';
+    document.getElementById('resultMsg').textContent = msg;
+    overlay.classList.add('active');
+    document.querySelector('#resultOverlay button').textContent = 'متابعة';
+});
+
+// البوس يشوف الأدوار في الكلاسيك
+socket.on('bossDataClassic', (d) => {
+    show('screen-boss-game');
+    document.getElementById('bossStory').innerHTML = '<p style="color:#aaa; text-align:center;">وضع المافيا الأصلي (لا يوجد قصة).</p>';
+    document.getElementById('clues-panel').parentElement.style.display = 'none'; // إخفاء الأدلة
+    document.getElementById('twistCard').style.display = 'none'; // إخفاء التويست
+
+    document.getElementById('bossSecrets').innerHTML = d.players.map(p =>
+        `<p><b style="color:#d4af37">${p.name}</b> — <span class="${p.role==='مافيا 🔪'?'badge-mafia':'badge-civ'}">${p.role}</span></p>`
+    ).join('');
+});
+
+// تفعيل زر تصويت البوس بعد الصباح
+socket.on('classicEnableVoting', () => {
+    const btn = document.getElementById('btnStartVote');
+    if(btn) {
+        btn.disabled = false;
+        btn.innerText = "بدء تصويت الإعدام 🗳️";
+    }
+});
 
 </script>
 <div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">    

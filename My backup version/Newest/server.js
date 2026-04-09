@@ -371,35 +371,49 @@ io.on('connection', (socket) => {
         io.to(data.roomCode).emit('twistShared', data.twist);
     });
     // ── بدء مرحلة التصويت (من البوس) ─────────────────────────────
+    // ── بدء مرحلة التصويت (من البوس) ─────────────────────────────
     socket.on('startVotingPhase', (roomCode) => {
         const room = rooms[roomCode];
         if (!room) return;
 
         const alivePlayers = room.players.filter(p => p.alive);
-        const deadCivilians = room.players.filter(p => !p.alive && !p.role.includes('🔪'));
         const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
         const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
+        
+        // الأموات مقسمين
+        const deadCivilians = room.players.filter(p => !p.alive && !p.role.includes('🔪'));
+        const deadMafia = room.players.filter(p => !p.alive && p.role.includes('🔪'));
 
         // حالة خاصة: 1 مافيا و 1 مواطن
         const specialCase = aliveMafia.length === 1 && aliveCivilians.length === 1 && alivePlayers.length === 2;
 
         if (specialCase) {
             const targets = alivePlayers.map(p => p.charName);
-            // المواطنون الميتون فقط هم من يصوتون
+            
+            // 1. المواطنون الميتون (الأشباح) فقط هم من يصوتون
             deadCivilians.forEach(p => {
                 io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: true });
             });
-            // الأحياء لا يصوتون
+            
+            // 2. الأحياء (المواطن والمافيا) لا يصوتون
             alivePlayers.forEach(p => {
                 io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false });
             });
+
+            // 3. المافيا الميتين لا يصوتون
+            deadMafia.forEach(p => {
+                io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true });
+            });
+
         } else {
-            // الحالة العادية: الأحياء يصوتون
+            // الحالة العادية
+            // الأحياء يصوتون
             alivePlayers.forEach(p => {
                 const targets = alivePlayers.filter(other => other.name !== p.name).map(other => other.charName);
                 io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: false });
             });
-            // الميتون لا يصوتون
+            
+            // كل الأموات لا يصوتون في الحالة العادية
             room.players.filter(p => !p.alive).forEach(p => {
                 io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true });
             });
@@ -408,6 +422,7 @@ io.on('connection', (socket) => {
         // إبلاغ البوس أن التصويت بدأ
         io.to(room.boss).emit('votingStarted');
     });
+    
 
     // ── التصويت ─────────────────────────────────────────────────
     socket.on('castVote', (data) => {

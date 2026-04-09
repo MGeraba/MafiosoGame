@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const classicMafia = require('./classicMafia'); // استدعاء ملف الكلاسيك
 
 const app = express();
 const server = http.createServer(app);
@@ -225,8 +226,18 @@ io.on('connection', (socket) => {
     socket.on('startGame', async (data) => {
         const room = rooms[data.roomCode];
         if (!room || room.players.length === 0) return;
+        
+        // لو البوس اختار الوضع الكلاسيكي
+        if (data.mode === 'classic') {
+            room.started = true;
+            classicMafia.startGame(io, room, data.roomCode);
+            return; // نوقف هنا عشان ميكملش لذكاء الاصطناعي
+        }
+
+        // --- باقي كود الذكاء الاصطناعي للمافيوسو كما هو أسفل هذا السطر ---
         room.started = true;
         room.clues = [];
+        // ... (باقي كود الـ prompt و الـ AI اللي عندك)
 
         const names = room.players.map(p => p.name).join(', ');
         const prompt = `أنت مؤلف لعبة مافيا محترف باللهجة المصرية. اللاعبون هم: [${names}]. 
@@ -542,6 +553,21 @@ io.on('connection', (socket) => {
             }
         }
     });
+    });
+
+    // ── أحداث لعبة المافيا الكلاسيكية ─────────────────────────────
+    socket.on('mafiaSubmitKill', (data) => {
+        const room = rooms[data.roomCode];
+        if (room && room.mode === 'classic') {
+            classicMafia.handleMafiaVote(io, room, data.roomCode, socket.id, data.target);
+        }
+    });
+
+    socket.on('doctorSubmitSave', (data) => {
+        const room = rooms[data.roomCode];
+        if (room && room.mode === 'classic') {
+            classicMafia.handleDoctorSave(io, room, data.roomCode, data.target);
+        }
     });
 
 const PORT = process.env.PORT || 3000;
