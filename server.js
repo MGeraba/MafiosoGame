@@ -4,7 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const classicMafia = require('./classicMafia'); // استدعاء ملف الكلاسيك
-const classicMafia = require('./classicMafia');
+
 const spyGame = require('./spyGame'); // إضااافة ملف الجاسوس
 const app = express();
 const server = http.createServer(app);
@@ -579,7 +579,7 @@ io.on('connection', (socket) => {
             spyGame.handleSpyGuess(io, room, data.roomCode, data.guess);
         }
     });
-    
+
     socket.on('disconnect', () => {
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
