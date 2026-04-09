@@ -526,17 +526,19 @@ function restorePlayerScreen(d, alreadyVoted, isAlive){
         </div>`;
 
     const ghostDiv=document.getElementById('ghostNotice');
+    
+    // ⬇️ التعديل المهم هنا ⬇️
+    // نخفي صندوق التصويت دائماً في بداية الجولة أو عند إعادة التحميل
+    document.getElementById('vUI').style.display='none';
+    
     if(!isAlive){
         ghostDiv.style.display='block';
-        document.getElementById('vUI').style.display='none';
     } else {
         ghostDiv.style.display='none';
         if(alreadyVoted){
-            document.getElementById('vUI').style.display='none';
             showToast('✅ صوتك اتسجل في هذه الجولة');
-        } else {
-            renderVoteButtons(d.allCharNames, false);
         }
+        // مسحنا السطر اللي كان بيعرض التصويت تلقائي
     }
 }
 
@@ -558,37 +560,49 @@ function toggleRole() {
 function renderVoteButtons(chars, isGhost){
     const vUI=document.getElementById('vUI');
     const ghostDiv=document.getElementById('ghostNotice');
-    const container=isGhost
-        ? document.getElementById('ghostVoteSection')
-        : document.getElementById('vBtns');
+    const ghostVoteSec=document.getElementById('ghostVoteSection');
+    const vBtns=document.getElementById('vBtns');
 
+    // لو البوس قفل التصويت أو مفيش أسماء
     if(!chars || chars.length===0){
         vUI.style.display='none';
+        if(ghostVoteSec) ghostVoteSec.innerHTML = '';
         return;
     }
 
-    container.innerHTML='';
+    // تصويت الميتين (حالة الـ 1v1)
     if(isGhost){
         ghostDiv.style.display='block';
-        document.getElementById('ghostVoteSection').innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — ساعد المدينة!</p>';
-    } else {
+        ghostVoteSec.innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — ساعد المدينة! حدد مين المافيوسو:</p>';
+        chars.forEach(char=>{
+            const btn=document.createElement('button');
+            btn.className = 'btn-blue';
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                ghostVoteSec.innerHTML='<p style="color:#27ae60">✅ تم تسجيل صوتك كشبح!</p>';
+            };
+            ghostVoteSec.appendChild(btn);
+        });
+        vUI.style.display='none'; // تأكيد إخفاء تصويت الأحياء
+    } 
+    // تصويت الأحياء العادي
+    else {
         vUI.style.display='block';
+        vBtns.innerHTML='';
+        chars.forEach(char=>{
+            const btn=document.createElement('button');
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                vUI.style.display='none';
+                showToast('✅ تم إرسال صوتك!');
+            };
+            vBtns.appendChild(btn);
+        });
     }
-
-    chars.forEach(char=>{
-        const btn=document.createElement('button');
-        btn.style.width='45%';
-        btn.textContent=char;
-        btn.onclick=()=>{
-            socket.emit('castVote',{roomCode:myCode, votedForChar:char});
-            const sess=SS.load();
-            SS.save({...sess, hasVoted:true});
-            vUI.style.display='none';
-            if(isGhost) document.getElementById('ghostVoteSection').innerHTML='<p style="color:#27ae60">✅ تم تسجيل صوتك كشبح!</p>';
-            else showToast('✅ تم إرسال صوتك!');
-        };
-        container.appendChild(btn);
-    });
 }
 
 socket.on('voteResultUpdate', (d)=>{

@@ -83,16 +83,18 @@ body {
 
 /* ── إخفاء وإظهار الدور (العين) ── */
 .role-hidden {
-    filter: blur(8px);
+    color: transparent !important;
+    background-color: #333 !important;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+    border-color: #555 !important;
     cursor: pointer;
     user-select: none;
-    transition: filter 0.3s ease;
+    transition: all 0.3s ease;
 }
 .role-visible {
-    filter: blur(0);
     cursor: pointer;
     user-select: none;
-    transition: filter 0.3s ease;
+    transition: all 0.3s ease;
 }
 .role-container {
     display: inline-flex;
@@ -215,6 +217,7 @@ body {
         <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
         <hr class="sep">
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+            <button class="btn-green btn-sm" id="btnStartVote" onclick="startVotingPhase()">بدء التصويت 🗳️</button>
             <button class="btn-danger btn-sm" onclick="confirmExecution()">تثبيت الإعدام 💀</button>
             <button class="btn-blue btn-sm" onclick="triggerPanic()">PANIC MODE 🚨</button>
             <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
@@ -460,6 +463,22 @@ socket.on('clueShared', (clueObj) => {
         }
     }
 });
+// استقبال اللاعبين للحدث المفاجئ (التويست)
+socket.on('twistShared', (twist) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += `
+            <div style="border-bottom:1px dashed #ff6b6b; padding-bottom:8px; margin-bottom:8px; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px;">
+                <span style="font-size:0.85em; color:#ff6b6b; font-weight:bold;">🚨 حدث مفاجئ (Plot Twist):</span><br>
+                <span style="color:#ffb3b3; font-size:1em; font-style:italic;">${twist}</span>
+            </div>`;
+            showToast('🚨 البوس أرسل حدثاً مفاجئاً، انتبه!', 5000);
+        }
+    }
+});
 
 socket.on('receiveClue', (clueObj)=>{
     addClue(clueObj);
@@ -634,13 +653,29 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
+// Plot Twist يوصل للبوس فقط ومعه زر الإرسال
 socket.on('panicTwist', (twist)=>{
     const card=document.getElementById('twistCard');
     const txt=document.getElementById('twistText');
     card.style.display='block';
-    txt.textContent=twist;
+    
+    // تنظيف النص من علامات الاقتباس اللي ممكن تبوظ الكود
+    const safeTwist = twist.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+    txt.innerHTML = `
+        <span style="font-size:1.1em">${twist}</span><br>
+        <button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist('${safeTwist}')">إرسال التويست للاعبين 📢</button>
+    `;
     showToast('🌀 Plot Twist تم توليده!', 3000);
 });
+
+// دالة إرسال التويست
+function sharePlotTwist(twistText) {
+    socket.emit('shareTwist', { roomCode: myCode, twist: twistText });
+    document.getElementById('shareTwistBtn').disabled = true;
+    document.getElementById('shareTwistBtn').textContent = 'تم الإرسال ✔️';
+    showToast('✅ تم إرسال الحدث المفاجئ للاعبين!', 3000);
+}
 
 // ════════════════════════════════════════════════
 //  Execution Result
@@ -687,6 +722,26 @@ function closeRoom(){
     }
 }
 
+function startVotingPhase() {
+    socket.emit('startVotingPhase', myCode);
+    document.getElementById('btnStartVote').disabled = true;
+    document.getElementById('btnStartVote').innerText = "جاري التصويت...";
+}
+
+socket.on('votingStarted', () => {
+    showToast('تم فتح باب التصويت للاعبين!', 3000);
+});
+
+// عشان نرجع الزر لطبيعته بعد الإعدام أو في الجولة الجديدة
+socket.on('executionResult', () => {
+    const btn = document.getElementById('btnStartVote');
+    if(btn) {
+        btn.disabled = false;
+        btn.innerText = "بدء التصويت 🗳️";
+    }
+    document.getElementById('vStats').innerHTML = '<p style="color:#555">لا يوجد أصوات بعد</p>';
+});
+
 // ════════════════════════════════════════════════
 //  Auto-fill code from URL
 // ════════════════════════════════════════════════
@@ -707,15 +762,23 @@ let peers = {};
 const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // 1. تشغيل المايك
+
 async function initVoiceChat() {
+    // التحقق من إن الموقع HTTPS (المايك مش هيشتغل على HTTP)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        alert("⚠️ عذراً، المحادثة الصوتية تتطلب اتصالاً آمناً (HTTPS). تأكد من الرابط الخاص بك.");
+        return;
+    }
+
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         document.getElementById('joinVoiceBtn').style.display = 'none';
         document.getElementById('muteBtn').style.display = 'inline-block';
         socket.emit('joinVoice', myCode);
-        alert("المايك شغال! اتكلم مع زمايلك");
+        showToast("🎙️ المايك شغال! تقدر تتكلم دلوقتي.");
     } catch (e) {
-        alert("لازم توافق على استخدام المايك");
+        console.error(e);
+        alert("❌ المتصفح منع استخدام المايك. الرجاء إعطاء الصلاحية من إعدادات المتصفح (علامة القفل بجوار الرابط).");
     }
 }
 
