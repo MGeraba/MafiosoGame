@@ -157,7 +157,6 @@ body {
         <p style="font-size:.8em;color:#555;margin-top:10px">(لا تغلق الصفحة)</p>
     </div>
 </div>
-
 <!-- ══════════════════ BOSS LOBBY ══════════════════ -->
 <div id="screen-boss-lobby" class="screen">
     <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
@@ -171,17 +170,29 @@ body {
 
     <div class="card">
         <h3 style="color:#d4af37;margin-bottom:10px">تجهيز الجولة</h3>
+        
         <select id="gameModeSelection" style="background:#222; color:#fff; border:1px solid #d4af37; padding:10px; width:90%; border-radius:8px; margin-bottom:10px;">
             <option value="mafioso">وضع المافيوسو 🕵️ (مع الذكاء الاصطناعي)</option>
             <option value="classic">وضع المافيا الأصلي 🔪 (بدون AI)</option>
         </select>
+        
         <div id="aiSettingsBox">
             <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
             <textarea id="tricks" placeholder="تريكات أو تفاصيل للقصة (اختياري)"></textarea>
         </div>
+
+        <!-- ⬇️ الأجزاء اللي كانت ناقصة عندك ⬇️ -->
+        <hr class="sep">
+        <span class="label">اللاعبون المتصلون:</span>
+        <div id="pList" style="margin:8px 0">انتظار...</div>
+        <p id="pCount" style="color:#888;font-size:.85em"></p>
+        
+        <button id="startBtn" class="btn-green" onclick="startGame()" style="display:none">ابدأ الجيم 🚀</button>
+        <button class="btn-danger" onclick="closeRoom()">إغلاق الغرفة ❌</button>
+        <!-- ⬆️ نهاية الأجزاء اللي كانت ناقصة ⬆️ -->
+
     </div>
 </div>
-
 <!-- ══════════════════ BOSS IN GAME ══════════════════ -->
 <div id="screen-boss-game" class="screen">
     <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
