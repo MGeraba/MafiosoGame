@@ -537,6 +537,21 @@ io.on('connection', (socket) => {
     socket.on('webrtc-ice-candidate', (data) => {
         io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
     });
+   // ── أحداث لعبة المافيا الكلاسيكية ─────────────────────────────
+    socket.on('mafiaSubmitKill', (data) => {
+        const room = rooms[data.roomCode];
+        if (room && room.mode === 'classic') {
+            classicMafia.handleMafiaVote(io, room, data.roomCode, socket.id, data.target);
+        }
+    });
+
+    socket.on('doctorSubmitSave', (data) => {
+        const room = rooms[data.roomCode];
+        if (room && room.mode === 'classic') {
+            classicMafia.handleDoctorSave(io, room, data.roomCode, data.target);
+        }
+    });
+
     socket.on('disconnect', () => {
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
@@ -555,20 +570,7 @@ io.on('connection', (socket) => {
     });
     });
 
-    // ── أحداث لعبة المافيا الكلاسيكية ─────────────────────────────
-    socket.on('mafiaSubmitKill', (data) => {
-        const room = rooms[data.roomCode];
-        if (room && room.mode === 'classic') {
-            classicMafia.handleMafiaVote(io, room, data.roomCode, socket.id, data.target);
-        }
-    });
-
-    socket.on('doctorSubmitSave', (data) => {
-        const room = rooms[data.roomCode];
-        if (room && room.mode === 'classic') {
-            classicMafia.handleDoctorSave(io, room, data.roomCode, data.target);
-        }
-    });
+ 
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
