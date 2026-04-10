@@ -166,6 +166,7 @@ body {
         <div id="qrcode"></div>
         <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
         <p style="color:#888;font-size:.85em">اللاعبون يسكنوا الـ QR أو يكتبوا الكود</p>
+        <button class="btn-blue btn-sm" onclick="shareRoom()" style="margin-top:8px">مشاركة الغرفة 📤</button>
     </div>
 
     <div class="card">
@@ -884,6 +885,20 @@ socket.on('error', (msg) => {
     }
 });
 
+async function shareRoom() {
+    const url = window.location.origin + '?code=' + myCode;
+    const text = `انضم لجيم المافيا! كود الغرفة: ${myCode}\n${url}`;
+    
+    if (navigator.share) {
+        // Web Share API - بيفتح صفحة المشاركة الأصلية (واتس، إنستا، إلخ)
+        try {
+            await navigator.share({ title: 'Mafioso Trial 🕵️', text: text, url: url });
+        } catch(e) {}
+    } else {
+        // fallback: copy to clipboard
+        navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
+    }
+}
 
 </script>
 <div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">    

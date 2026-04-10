@@ -34,7 +34,6 @@ async function tryGemini(prompt) {
         const key = GEMINI_KEYS[(geminiIndex + i) % GEMINI_KEYS.length];
         try {
             const genAI = new GoogleGenerativeAI(key);
-            // إضافة إجبار الـ JSON هنا
             const model = genAI.getGenerativeModel({ 
                 model: "gemini-2.5-flash", 
                 generationConfig: { responseMimeType: "application/json" } 
@@ -61,7 +60,7 @@ async function tryGroq(prompt) {
                     messages: [{ role: "user", content: prompt }],
                     temperature: 0.8, 
                     max_tokens: 2000,
-                    response_format: { type: "json_object" } // إضافة إجبار الـ JSON لجروق
+                    response_format: { type: "json_object" }
                 })
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -90,36 +89,38 @@ async function getAIResponse(prompt) {
 
 app.use(express.static('public'));
 
-let rooms = {};
+// ════════════════════════════════════════════════
+//  Rooms — كل لعبة لها rooms منفصلة
+// ════════════════════════════════════════════════
+let rooms = {};     // المافيوسو تريال (الأصلية)
+let mcRooms = {};   // المافيا الكلاسيك
+let impRooms = {};  // الإمبوستر
 
 // ════════════════════════════════════════════════
 //  Helpers
 // ════════════════════════════════════════════════
-
-// حساب حالة الفوز
 function checkWinCondition(room) {
     const alivePlayers = room.players.filter(p => p.alive);
     const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
     const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
-
-    // المواطنون يخسرون فقط إذا ماتوا جميعاً
     if (aliveCivilians.length === 0) {
         return { over: true, winner: 'mafia', aliveMafia, aliveCivilians };
     }
-    // المافيا تخسر فقط إذا ماتوا جميعاً
     if (aliveMafia.length === 0) {
         return { over: true, winner: 'civilians', aliveMafia, aliveCivilians };
     }
     return { over: false, aliveMafia, aliveCivilians };
 }
 
-
 // ════════════════════════════════════════════════
 //  Socket Events
 // ════════════════════════════════════════════════
 io.on('connection', (socket) => {
 
-    // ── إنشاء غرفة ──────────────────────────────────────────────
+    // ══════════════════════════════════════════════
+    //  ① المافيوسو تريال (الأصلية — بدون تغيير)
+    // ══════════════════════════════════════════════
+
     socket.on('createRoom', () => {
         const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
         rooms[roomCode] = {
@@ -137,18 +138,11 @@ io.on('connection', (socket) => {
         console.log('Room created:', roomCode);
     });
 
-    // ── Reconnect البوس ──────────────────────────────────────────
     socket.on('bossReconnect', ({ roomCode, bossToken }) => {
         const room = rooms[roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
         if (room.bossToken !== bossToken) { socket.emit('error', 'غير مصرح'); return; }
-        
-        // التعديل هنا: نلغي المؤقت لو البوس رجع للغرفة
-        if (room.deleteTimer) {
-            clearTimeout(room.deleteTimer);
-            room.deleteTimer = null;
-        }
-
+        if (room.deleteTimer) { clearTimeout(room.deleteTimer); room.deleteTimer = null; }
         room.boss = socket.id;
         socket.join(roomCode);
         socket.emit('bossReconnected', {
@@ -160,11 +154,9 @@ io.on('connection', (socket) => {
         });
     });
 
-    // ── انضمام لاعب ─────────────────────────────────────────────
     socket.on('joinRoom', (data) => {
         const room = rooms[data.roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
-
         const existing = room.players.find(p => p.name === data.playerName);
         if (existing) {
             existing.id = socket.id;
@@ -176,29 +168,22 @@ io.on('connection', (socket) => {
                     story: room.scenario.story,
                     charName: existing.charName,
                     charSecret: existing.secret,
-                    allCharNames: room.players
-                        .filter(p => p.alive && p.name !== existing.name)
-                        .map(p => p.charName),
+                    allCharNames: room.players.filter(p => p.alive && p.name !== existing.name).map(p => p.charName),
                     isAlive: existing.alive
                 });
             }
         } else {
             if (room.started) { socket.emit('error', 'اللعبة بدأت خلاص!'); return; }
-            room.players.push({
-                id: socket.id, name: data.playerName,
-                role: 'مواطن', alive: true, charName: '', secret: ''
-            });
+            room.players.push({ id: socket.id, name: data.playerName, role: 'مواطن', alive: true, charName: '', secret: '' });
             socket.join(data.roomCode);
             socket.emit('joinedSuccess', { reconnected: false });
         }
         io.to(room.boss).emit('updatePlayers', room.players);
     });
 
-    // ── Reconnect لاعب ───────────────────────────────────────────
     socket.on('playerReconnect', (data) => {
         const room = rooms[data.roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
-
         const existing = room.players.find(p => p.name === data.playerName);
         if (existing) {
             existing.id = socket.id;
@@ -209,9 +194,7 @@ io.on('connection', (socket) => {
                     story: room.scenario.story,
                     charName: existing.charName,
                     charSecret: existing.secret,
-                    allCharNames: room.players
-                        .filter(p => p.alive && p.name !== existing.name)
-                        .map(p => p.charName),
+                    allCharNames: room.players.filter(p => p.alive && p.name !== existing.name).map(p => p.charName),
                     isAlive: existing.alive
                 });
             } else if (!room.started) {
@@ -221,7 +204,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ── بدء اللعبة ──────────────────────────────────────────────
     socket.on('startGame', async (data) => {
         const room = rooms[data.roomCode];
         if (!room || room.players.length === 0) return;
@@ -229,11 +211,7 @@ io.on('connection', (socket) => {
         room.clues = [];
 
         const names = room.players.map(p => p.name).join(', ');
-        const prompt = `أنت مؤلف لعبة مافيا محترف باللهجة المصرية. اللاعبون هم: [${names}]. 
-الجريمة: ${data.crimeType || "جريمة غامضة"}. تريكات: ${data.tricks || "لا يوجد"}.
-اكتب قصة جريمة مصرية مشوقة ووزع أسامي شخصيات وأسرار لكل لاعب.
-الرد JSON فقط بدون أي نص خارجه:
-{"story": "القصة هنا بالتفصيل", "assignments": [{"name": "الاسم الحقيقي", "charName": "اسم الشخصية", "secret": "السر الخاص بالشخصية"}]}`;
+        const prompt = `أنت مؤلف لعبة مافيا محترف باللهجة المصرية. اللاعبون هم: [${names}]. \nالجريمة: ${data.crimeType || "جريمة غامضة"}. تريكات: ${data.tricks || "لا يوجد"}.\nاكتب قصة جريمة مصرية مشوقة ووزع أسامي شخصيات وأسرار لكل لاعب.\nالرد JSON فقط بدون أي نص خارجه:\n{"story": "القصة هنا بالتفصيل", "assignments": [{"name": "الاسم الحقيقي", "charName": "اسم الشخصية", "secret": "السر الخاص بالشخصية"}]}`;
 
         const response = await getAIResponse(prompt);
         if (!response) {
@@ -243,33 +221,20 @@ io.on('connection', (socket) => {
         }
 
         let scenario;
-        // التعديل هنا: تنظيف النص من علامات الماركداون قبل التحليل
         let cleanedResponse = response.replace(/```json/gi, '').replace(/```/g, '').trim();
-
         try { 
             scenario = JSON.parse(cleanedResponse); 
         } catch (e) {
-            // محاولة استخراج JSON من النص
             const match = cleanedResponse.match(/\{[\s\S]*\}/);
             if (match) { 
-                try { 
-                    scenario = JSON.parse(match[0]); 
-                } catch(e2) { 
-                    // إرسال رسالة خطأ بدلاً من الصمت
-                    io.to(room.boss).emit('error', 'الذكاء الاصطناعي كتب قصة بس التنسيق باظ، دوس "ابدأ الجيم" تاني!');
-                    room.started = false; 
-                    return; 
-                } 
+                try { scenario = JSON.parse(match[0]); } 
+                catch(e2) { io.to(room.boss).emit('error', 'الذكاء الاصطناعي كتب قصة بس التنسيق باظ، دوس "ابدأ الجيم" تاني!'); room.started = false; return; } 
             } else { 
-                // إرسال رسالة خطأ بدلاً من الصمت
-                io.to(room.boss).emit('error', 'الذكاء الاصطناعي ماردش بتنسيق صحيح، دوس "ابدأ الجيم" تاني!');
-                room.started = false; 
-                return; 
+                io.to(room.boss).emit('error', 'الذكاء الاصطناعي ماردش بتنسيق صحيح، دوس "ابدأ الجيم" تاني!'); room.started = false; return; 
             }
         }
 
         room.scenario = scenario;
-
         const mafiaCount = room.players.length > 4 ? 2 : 1;
         const shuffled = [...room.players].sort(() => Math.random() - 0.5);
         room.players.forEach(p => p.role = 'مواطن');
@@ -278,43 +243,28 @@ io.on('connection', (socket) => {
         room.players.forEach(p => {
             const assign = scenario.assignments?.find(a => a.name === p.name);
             p.charName = assign?.charName || p.name;
-            p.secret   = assign?.secret   || "لا يوجد سر";
+            p.secret = assign?.secret || "لا يوجد سر";
         });
 
-        // إرسال للاعبين
         room.players.forEach(p => {
             io.to(p.id).emit('gameData', {
-                role: p.role,
-                story: scenario.story,
-                charName: p.charName,
+                role: p.role, story: scenario.story, charName: p.charName,
                 charSecret: p.secret,
                 allCharNames: room.players.filter(o => o.name !== p.name).map(o => o.charName),
                 isAlive: true
             });
         });
 
-        // إرسال للبوس مع القصة كاملة
-        io.to(room.boss).emit('bossData', {
-            story: scenario.story,
-            players: room.players
-        });
-
-        // أول دليل في بداية اللعبة
+        io.to(room.boss).emit('bossData', { story: scenario.story, players: room.players });
         await sendClue(data.roomCode);
     });
 
-    // ── إرسال دليل (للبوس فقط، ثابت) ──────────────────────────
     async function sendClue(roomCode) {
         const room = rooms[roomCode];
         if (!room?.scenario) return;
         const mafiaChars = room.players.filter(p => p.role.includes('🔪')).map(p => p.charName).join(' و ');
         const prevClues = room.clues.map(c => c.text).join(' | ');
-        const prompt = `في لعبة المافيا هذه:
-القصة: ${room.scenario.story}
-المافيا (سري جداً): ${mafiaChars}
-الأدلة السابقة: ${prevClues || "لا يوجد"}
-أعطني دليلاً مادياً غامضاً جديداً يلمح لأحد المافيا في الجولة ${room.round}.
-الرد يجب أن يكون JSON فقط بهذا الشكل: {"clue": "نص الدليل هنا"}`;
+        const prompt = `في لعبة المافيا هذه:\nالقصة: ${room.scenario.story}\nالمافيا (سري جداً): ${mafiaChars}\nالأدلة السابقة: ${prevClues || "لا يوجد"}\nأعطني دليلاً مادياً غامضاً جديداً يلمح لأحد المافيا في الجولة ${room.round}.\nالرد يجب أن يكون JSON فقط بهذا الشكل: {"clue": "نص الدليل هنا"}`;
         
         const response = await getAIResponse(prompt);
         if (!response) return;
@@ -322,227 +272,169 @@ io.on('connection', (socket) => {
         try {
             let cleaned = response.replace(/```json/gi, '').replace(/```/g, '').trim();
             let parsed = JSON.parse(cleaned);
-            const clueObj = {
-                text: parsed.clue || parsed,
-                round: room.round,
-                time: new Date().toLocaleTimeString('ar-EG')
-            };
+            const clueObj = { text: parsed.clue || parsed, round: room.round, time: new Date().toLocaleTimeString('ar-EG') };
             room.clues.push(clueObj);
             io.to(room.boss).emit('receiveClue', clueObj);
-        } catch (e) {
-            console.error("Clue parse error");
-        }
+        } catch (e) { console.error("Clue parse error"); }
     }
 
     socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
 
-    // ── إرسال البوس الدليل للاعبين ─────────────────────────────
-    socket.on('shareClue', (data) => {
-        // نبعت الدليل لكل اللي في الغرفة (عشان يظهر عند اللاعبين)
-        io.to(data.roomCode).emit('clueShared', data.clue);
-    });
+    socket.on('shareClue', (data) => { io.to(data.roomCode).emit('clueShared', data.clue); });
 
-    // ── Panic Mode — حدث مفاجئ + تأثير بصري ────────────────────
     socket.on('triggerPanic', async (roomCode) => {
         const room = rooms[roomCode];
         io.to(roomCode).emit('panicAction');
-
         if (room?.scenario) {
-            const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. 
-اللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.
-اكتب حدثاً مفاجئاً (Plot Twist) يغير مجرى التحقيق.
-الرد يجب أن يكون JSON فقط بهذا الشكل: {"twist": "نص التويست هنا"}`;
-            
+            const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. \nاللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.\nاكتب حدثاً مفاجئاً (Plot Twist) يغير مجرى التحقيق.\nالرد يجب أن يكون JSON فقط بهذا الشكل: {"twist": "نص التويست هنا"}`;
             const response = await getAIResponse(prompt);
             if (response) {
                 try {
                     let cleaned = response.replace(/```json/gi, '').replace(/```/g, '').trim();
                     let parsed = JSON.parse(cleaned);
                     io.to(room.boss).emit('panicTwist', parsed.twist || parsed);
-                } catch(e) {
-                    console.error("Twist parse error");
-                }
+                } catch(e) {}
             }
         }
     });
 
-// ── إرسال البوس التويست للاعبين ─────────────────────────────
-    socket.on('shareTwist', (data) => {
-        io.to(data.roomCode).emit('twistShared', data.twist);
-    });
-    // ── بدء مرحلة التصويت (من البوس) ─────────────────────────────
-    // ── بدء مرحلة التصويت (من البوس) ─────────────────────────────
+    socket.on('shareTwist', (data) => { io.to(data.roomCode).emit('twistShared', data.twist); });
+
     socket.on('startVotingPhase', (roomCode) => {
         const room = rooms[roomCode];
         if (!room) return;
-
         const alivePlayers = room.players.filter(p => p.alive);
         const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
         const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
-        
-        // الأموات مقسمين
         const deadCivilians = room.players.filter(p => !p.alive && !p.role.includes('🔪'));
         const deadMafia = room.players.filter(p => !p.alive && p.role.includes('🔪'));
-
-        // حالة خاصة: 1 مافيا و 1 مواطن
         const specialCase = aliveMafia.length === 1 && aliveCivilians.length === 1 && alivePlayers.length === 2;
 
         if (specialCase) {
             const targets = alivePlayers.map(p => p.charName);
-            
-            // 1. المواطنون الميتون (الأشباح) فقط هم من يصوتون
-            deadCivilians.forEach(p => {
-                io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: true });
-            });
-            
-            // 2. الأحياء (المواطن والمافيا) لا يصوتون
-            alivePlayers.forEach(p => {
-                io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false });
-            });
-
-            // 3. المافيا الميتين لا يصوتون
-            deadMafia.forEach(p => {
-                io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true });
-            });
-
+            deadCivilians.forEach(p => { io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: true }); });
+            alivePlayers.forEach(p => { io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false }); });
+            deadMafia.forEach(p => { io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true }); });
         } else {
-            // الحالة العادية
-            // الأحياء يصوتون
             alivePlayers.forEach(p => {
                 const targets = alivePlayers.filter(other => other.name !== p.name).map(other => other.charName);
                 io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: false });
             });
-            
-            // كل الأموات لا يصوتون في الحالة العادية
-            room.players.filter(p => !p.alive).forEach(p => {
-                io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true });
-            });
+            room.players.filter(p => !p.alive).forEach(p => { io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true }); });
         }
-        
-        // إبلاغ البوس أن التصويت بدأ
         io.to(room.boss).emit('votingStarted');
     });
-    
 
-    // ── التصويت ─────────────────────────────────────────────────
     socket.on('castVote', (data) => {
         const room = rooms[data.roomCode];
         if (!room) return;
         room.votes[socket.id] = data.votedForChar;
         const counts = {};
         Object.values(room.votes).forEach(v => counts[v] = (counts[v] || 0) + 1);
-        io.to(room.boss).emit('voteResultUpdate', {
-            totalVotes: Object.keys(room.votes).length,
-            details: counts
-        });
+        io.to(room.boss).emit('voteResultUpdate', { totalVotes: Object.keys(room.votes).length, details: counts });
     });
-// ── تنفيذ الإعدام ────────────────────────────────────────────
+
     socket.on('executePlayer', (roomCode) => {
         const room = rooms[roomCode];
         if (!room) return;
-
         const counts = {};
         Object.values(room.votes).forEach(v => counts[v] = (counts[v] || 0) + 1);
         const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
         if (!sorted.length) { io.to(room.boss).emit('error', 'مفيش تصويت لسه!'); return; }
-
-        // التعديل هنا: فحص التعادل
-        if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) {
-            io.to(room.boss).emit('error', 'في تعادل في التصويت! خلّي اللاعبين يتناقشوا وصوّتوا تاني.');
-            return; // وقف التنفيذ هنا
-        }
+        if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) { io.to(room.boss).emit('error', 'في تعادل في التصويت! خلّي اللاعبين يتناقشوا وصوّتوا تاني.'); return; }
 
         const kickedChar = sorted[0][0];
         const p = room.players.find(pl => pl.charName === kickedChar);
         if (p) p.alive = false;
-
         const isMafia = p?.role.includes('🔪') || false;
         const win = checkWinCondition(room);
 
-        // رسالة الإعدام
         let execMsg = '';
         if (isMafia) {
             const remainingMafia = win.aliveMafia.length;
-            if (win.over && win.winner === 'civilians') {
-                execMsg = `🎉 انتصرت المدينة! "${kickedChar}" كان المافيوسو الأخير! اللعبة انتهت.`;
-            } else {
-                execMsg = `✅ أصبتم! "${kickedChar}" كان مافيوسو 🔪 — لا يزال ${remainingMafia} مافيا في الخفاء...`;
-            }
+            if (win.over && win.winner === 'civilians') execMsg = `🎉 انتصرت المدينة! "${kickedChar}" كان المافيوسو الأخير! اللعبة انتهت.`;
+            else execMsg = `✅ أصبتم! "${kickedChar}" كان مافيوسو 🔪 — لا يزال ${remainingMafia} مافيا في الخفاء...`;
         } else {
             execMsg = `😢 يا نهار أبيض! "${kickedChar}" كان مواطناً بريئاً. المدينة خسرت رجلاً صالحاً والمافيا لا تزال حرة!`;
         }
 
-        io.to(roomCode).emit('executionResult', {
-            charName: kickedChar,
-            isMafia,
-            message: execMsg,
-            gameOver: win.over,
-            winner: win.winner
-        });
+        io.to(roomCode).emit('executionResult', { charName: kickedChar, isMafia, message: execMsg, gameOver: win.over, winner: win.winner });
 
         if (win.over) {
-            let finalMsg = win.winner === 'civilians'
-                ? `🏆 المدينة انتصرت! تم القضاء على المافيا كلها!`
-                : `💀 المافيا كسبت! استولوا على المدينة!`;
-            setTimeout(() => {
-                io.to(roomCode).emit('gameOver', finalMsg);
-                if (rooms[roomCode]) rooms[roomCode].gameOver = true;
-            }, 4000);
+            let finalMsg = win.winner === 'civilians' ? `🏆 المدينة انتصرت! تم القضاء على المافيا كلها!` : `💀 المافيا كسبت! استولوا على المدينة!`;
+            setTimeout(() => { io.to(roomCode).emit('gameOver', finalMsg); if (rooms[roomCode]) rooms[roomCode].gameOver = true; }, 4000);
         } else {
             room.round++;
             room.votes = {};
-            // نرسل دليل جديد فقط، ولا نرسل قوائم التصويت!
             sendClue(roomCode);
         }
     });
 
-    // ── إغلاق الغرفة (البوس) ─────────────────────────────────────
-    socket.on('closeRoom', (roomCode) => {
-        io.to(roomCode).emit('roomEnded');
-        delete rooms[roomCode];
-        console.log('Room closed:', roomCode);
-    });
+    socket.on('closeRoom', (roomCode) => { io.to(roomCode).emit('roomEnded'); delete rooms[roomCode]; console.log('Room closed:', roomCode); });
 
-    // ════════════════════════════════════════════════
-    //  نظام المحادثة الصوتية (WebRTC Signaling)
-    // ════════════════════════════════════════════════
-    
-    // لاعب بيدخل غرفة الصوت
-    socket.on('joinVoice', (roomCode) => {
-        socket.join(`${roomCode}-voice`);
-        // بنبلغ باقي الناس اللي في غرفة الصوت إن في حد جديد دخل
-        socket.to(`${roomCode}-voice`).emit('user-joined-voice', socket.id);
-    });
+    // WebRTC Signaling
+    socket.on('joinVoice', (roomCode) => { socket.join(`${roomCode}-voice`); socket.to(`${roomCode}-voice`).emit('user-joined-voice', socket.id); });
+    socket.on('webrtc-offer', (data) => { io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp }); });
+    socket.on('webrtc-answer', (data) => { io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp }); });
+    socket.on('webrtc-ice-candidate', (data) => { io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate }); });
 
-    // تبادل بيانات الاتصال بين اللاعبين
-    socket.on('webrtc-offer', (data) => {
-        io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
-    });
+    // ══════════════════════════════════════════════
+    //  ② المافيا الكلاسيك
+    // ══════════════════════════════════════════════
+    registerMafiaClassic(io, socket, mcRooms, getAIResponse);
 
-    socket.on('webrtc-answer', (data) => {
-        io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp });
-    });
+    // ══════════════════════════════════════════════
+    //  ③ الإمبوستر
+    // ══════════════════════════════════════════════
+    registerImpostor(io, socket, impRooms, getAIResponse);
 
-    socket.on('webrtc-ice-candidate', (data) => {
-        io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
-    });
+    // ══════════════════════════════════════════════
+    //  Disconnect
+    // ══════════════════════════════════════════════
     socket.on('disconnect', () => {
+        // المافيوسو تريال
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
-            // لو اللي فصل هو البوس، نعمل مؤقت 10 دقايق يمسح الغرفة
             if (room.boss === socket.id) {
                 room.deleteTimer = setTimeout(() => {
-                    if (rooms[roomCode]) {
-                        io.to(roomCode).emit('roomEnded');
-                        delete rooms[roomCode];
-                        console.log(`Room ${roomCode} deleted due to boss inactivity.`);
-                    }
-                }, 10 * 60 * 1000); // 10 دقائق
+                    if (rooms[roomCode]) { io.to(roomCode).emit('roomEnded'); delete rooms[roomCode]; console.log(`Room ${roomCode} deleted.`); }
+                }, 10 * 60 * 1000);
+                break;
+            }
+        }
+        // المافيا الكلاسيك
+        for (const roomCode in mcRooms) {
+            const room = mcRooms[roomCode];
+            if (room.boss === socket.id) {
+                room.deleteTimer = setTimeout(() => {
+                    if (mcRooms[roomCode]) { io.to('mc_' + roomCode).emit('roomEnded'); delete mcRooms[roomCode]; }
+                }, 10 * 60 * 1000);
+                break;
+            }
+        }
+        // الإمبوستر
+        for (const roomCode in impRooms) {
+            const room = impRooms[roomCode];
+            if (room.boss === socket.id) {
+                room.deleteTimer = setTimeout(() => {
+                    if (impRooms[roomCode]) { io.to('imp_' + roomCode).emit('roomEnded'); delete impRooms[roomCode]; }
+                }, 10 * 60 * 1000);
                 break;
             }
         }
     });
-    });
+});
+
+// ════════════════════════════════════════════════
+//  Load Game Modules
+// ════════════════════════════════════════════════
+const registerMafiaClassic = require('./mafia-classic-server');
+const registerImpostor = require('./impostor-server');
+
+// ════════════════════════════════════════════════
+//  Keep-alive (يمنع الـ 502 على الاستضافة المجانية)
+// ════════════════════════════════════════════════
+setInterval(() => { console.log('💓 Keep-alive'); }, 10 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

@@ -72,6 +72,42 @@
         .btn-blue{background:#17a2b8!important;color:#fff!important}
         .btn-gray{background:#444!important;color:#fff!important}
         .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
+
+
+        #voiceChatBar { z-index: 99999 !important; display: block !important; }
+
+        /* ── حل مشكلة الشريط السفلي ── */
+body {
+    padding-bottom: 100px !important; /* مساحة كافية تحت عشان الشريط ميغطيش حاجة */
+}
+
+/* ── إخفاء وإظهار الدور (العين) ── */
+.role-hidden {
+    color: transparent !important;
+    background-color: #333 !important;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+    border-color: #555 !important;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+}
+.role-visible {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+}
+.role-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+    background: #1a1a1a;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px dashed #555;
+}
+
     </style>
 </head>
 <body>
@@ -130,6 +166,7 @@
         <div id="qrcode"></div>
         <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
         <p style="color:#888;font-size:.85em">اللاعبون يسكنوا الـ QR أو يكتبوا الكود</p>
+        <button class="btn-blue btn-sm" onclick="shareRoom()" style="margin-top:8px">مشاركة الغرفة 📤</button>
     </div>
 
     <div class="card">
@@ -181,6 +218,7 @@
         <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
         <hr class="sep">
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+            <button class="btn-green btn-sm" id="btnStartVote" onclick="startVotingPhase()">بدء التصويت 🗳️</button>
             <button class="btn-danger btn-sm" onclick="confirmExecution()">تثبيت الإعدام 💀</button>
             <button class="btn-blue btn-sm" onclick="triggerPanic()">PANIC MODE 🚨</button>
             <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
@@ -386,13 +424,62 @@ function renderBossSecrets(players){
 // ════════════════════════════════════════════════
 function addClue(clueObj){
     const panel=document.getElementById('clues-panel');
-    if(panel.querySelector('p')) panel.innerHTML='';
+    if(panel.querySelector('p')) panel.innerHTML=''; // مسح كلمة "جاري التوليد"
+    
     const div=document.createElement('div');
     div.className='clue-item';
     div.innerHTML=`<div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div><div class="clue-text">🔍 ${clueObj.text}</div>`;
+    
+    // إضافة زر الإرسال لو اللي فاتح هو البوس
+    if(isBoss) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-gray btn-sm';
+        btn.style.marginTop = '8px';
+        btn.textContent = 'إرسال للاعبين 📢';
+        btn.onclick = () => {
+            socket.emit('shareClue', { roomCode: myCode, clue: clueObj });
+            showToast('✅ تم إرسال الدليل للاعبين!', 3000);
+            btn.disabled = true;
+            btn.textContent = 'تم الإرسال ✔️';
+        };
+        div.appendChild(btn);
+    }
+    
     panel.appendChild(div);
     panel.scrollTop=panel.scrollHeight;
 }
+
+// استقبال اللاعبين للدليل من البوس
+socket.on('clueShared', (clueObj) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += `<div style="border-bottom:1px solid #2d6a2d; padding-bottom:5px; margin-bottom:5px;">
+                <span style="font-size:0.7em; color:#888;">جولة ${clueObj.round}:</span> 
+                <span style="color:#7fff7f; font-size:0.95em;">${clueObj.text}</span>
+            </div>`;
+            showToast('📢 البوس أرسل دليلاً جديداً، اقرأه الآن!', 5000);
+        }
+    }
+});
+// استقبال اللاعبين للحدث المفاجئ (التويست)
+socket.on('twistShared', (twist) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += `
+            <div style="border-bottom:1px dashed #ff6b6b; padding-bottom:8px; margin-bottom:8px; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px;">
+                <span style="font-size:0.85em; color:#ff6b6b; font-weight:bold;">🚨 حدث مفاجئ (Plot Twist):</span><br>
+                <span style="color:#ffb3b3; font-size:1em; font-style:italic;">${twist}</span>
+            </div>`;
+            showToast('🚨 البوس أرسل حدثاً مفاجئاً، انتبه!', 5000);
+        }
+    }
+});
 
 socket.on('receiveClue', (clueObj)=>{
     addClue(clueObj);
@@ -420,25 +507,51 @@ function restorePlayerScreen(d, alreadyVoted, isAlive){
         <div class="card">
             <h2 style="color:#d4af37;margin-bottom:6px">${d.charName}</h2>
             <div class="story-box">${d.story}</div>
+            
             <div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
                 <span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span>
                 <p style="color:#00ffcc;margin-top:4px">${d.charSecret}</p>
             </div>
-            <div class="${isMafia?'badge-mafia':'badge-civ'}" style="font-size:1.4em;margin-top:6px">${d.role}</div>
+            
+            <p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>
+            <div class="role-container" onclick="toggleRole()">
+                <span style="font-size: 1.8em;">👁️</span>
+                <span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':'badge-civ'}">${d.role}</span>
+            </div>
+            
+            <!-- مكان أدلة البوس لما يبعتها -->
+            <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">
+                <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>
+                <div id="playerCluesList"></div>
+            </div>
         </div>`;
 
     const ghostDiv=document.getElementById('ghostNotice');
+    
+    // ⬇️ التعديل المهم هنا ⬇️
+    // نخفي صندوق التصويت دائماً في بداية الجولة أو عند إعادة التحميل
+    document.getElementById('vUI').style.display='none';
+    
     if(!isAlive){
         ghostDiv.style.display='block';
-        document.getElementById('vUI').style.display='none';
     } else {
         ghostDiv.style.display='none';
         if(alreadyVoted){
-            document.getElementById('vUI').style.display='none';
             showToast('✅ صوتك اتسجل في هذه الجولة');
-        } else {
-            renderVoteButtons(d.allCharNames, false);
         }
+        // مسحنا السطر اللي كان بيعرض التصويت تلقائي
+    }
+}
+
+// دالة تشغيل العين
+function toggleRole() {
+    const roleSpan = document.getElementById('mySecretRole');
+    if(roleSpan.classList.contains('role-hidden')) {
+        roleSpan.classList.remove('role-hidden');
+        roleSpan.classList.add('role-visible');
+    } else {
+        roleSpan.classList.add('role-hidden');
+        roleSpan.classList.remove('role-visible');
     }
 }
 
@@ -448,37 +561,49 @@ function restorePlayerScreen(d, alreadyVoted, isAlive){
 function renderVoteButtons(chars, isGhost){
     const vUI=document.getElementById('vUI');
     const ghostDiv=document.getElementById('ghostNotice');
-    const container=isGhost
-        ? document.getElementById('ghostVoteSection')
-        : document.getElementById('vBtns');
+    const ghostVoteSec=document.getElementById('ghostVoteSection');
+    const vBtns=document.getElementById('vBtns');
 
+    // لو البوس قفل التصويت أو مفيش أسماء
     if(!chars || chars.length===0){
         vUI.style.display='none';
+        if(ghostVoteSec) ghostVoteSec.innerHTML = '';
         return;
     }
 
-    container.innerHTML='';
+    // تصويت الميتين (حالة الـ 1v1)
     if(isGhost){
         ghostDiv.style.display='block';
-        document.getElementById('ghostVoteSection').innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — ساعد المدينة!</p>';
-    } else {
+        ghostVoteSec.innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — ساعد المدينة! حدد مين المافيوسو:</p>';
+        chars.forEach(char=>{
+            const btn=document.createElement('button');
+            btn.className = 'btn-blue';
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                ghostVoteSec.innerHTML='<p style="color:#27ae60">✅ تم تسجيل صوتك كشبح!</p>';
+            };
+            ghostVoteSec.appendChild(btn);
+        });
+        vUI.style.display='none'; // تأكيد إخفاء تصويت الأحياء
+    } 
+    // تصويت الأحياء العادي
+    else {
         vUI.style.display='block';
+        vBtns.innerHTML='';
+        chars.forEach(char=>{
+            const btn=document.createElement('button');
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                vUI.style.display='none';
+                showToast('✅ تم إرسال صوتك!');
+            };
+            vBtns.appendChild(btn);
+        });
     }
-
-    chars.forEach(char=>{
-        const btn=document.createElement('button');
-        btn.style.width='45%';
-        btn.textContent=char;
-        btn.onclick=()=>{
-            socket.emit('castVote',{roomCode:myCode, votedForChar:char});
-            const sess=SS.load();
-            SS.save({...sess, hasVoted:true});
-            vUI.style.display='none';
-            if(isGhost) document.getElementById('ghostVoteSection').innerHTML='<p style="color:#27ae60">✅ تم تسجيل صوتك كشبح!</p>';
-            else showToast('✅ تم إرسال صوتك!');
-        };
-        container.appendChild(btn);
-    });
 }
 
 socket.on('voteResultUpdate', (d)=>{
@@ -543,13 +668,29 @@ socket.on('panicAction', ()=>{
 });
 
 // Plot Twist يوصل للبوس فقط
+// Plot Twist يوصل للبوس فقط ومعه زر الإرسال
 socket.on('panicTwist', (twist)=>{
     const card=document.getElementById('twistCard');
     const txt=document.getElementById('twistText');
     card.style.display='block';
-    txt.textContent=twist;
+    
+    // تنظيف النص من علامات الاقتباس اللي ممكن تبوظ الكود
+    const safeTwist = twist.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+    txt.innerHTML = `
+        <span style="font-size:1.1em">${twist}</span><br>
+        <button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist('${safeTwist}')">إرسال التويست للاعبين 📢</button>
+    `;
     showToast('🌀 Plot Twist تم توليده!', 3000);
 });
+
+// دالة إرسال التويست
+function sharePlotTwist(twistText) {
+    socket.emit('shareTwist', { roomCode: myCode, twist: twistText });
+    document.getElementById('shareTwistBtn').disabled = true;
+    document.getElementById('shareTwistBtn').textContent = 'تم الإرسال ✔️';
+    showToast('✅ تم إرسال الحدث المفاجئ للاعبين!', 3000);
+}
 
 // ════════════════════════════════════════════════
 //  Execution Result
@@ -596,6 +737,26 @@ function closeRoom(){
     }
 }
 
+function startVotingPhase() {
+    socket.emit('startVotingPhase', myCode);
+    document.getElementById('btnStartVote').disabled = true;
+    document.getElementById('btnStartVote').innerText = "جاري التصويت...";
+}
+
+socket.on('votingStarted', () => {
+    showToast('تم فتح باب التصويت للاعبين!', 3000);
+});
+
+// عشان نرجع الزر لطبيعته بعد الإعدام أو في الجولة الجديدة
+socket.on('executionResult', () => {
+    const btn = document.getElementById('btnStartVote');
+    if(btn) {
+        btn.disabled = false;
+        btn.innerText = "بدء التصويت 🗳️";
+    }
+    document.getElementById('vStats').innerHTML = '<p style="color:#555">لا يوجد أصوات بعد</p>';
+});
+
 // ════════════════════════════════════════════════
 //  Auto-fill code from URL
 // ════════════════════════════════════════════════
@@ -616,15 +777,23 @@ let peers = {};
 const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // 1. تشغيل المايك
+
 async function initVoiceChat() {
+    // التحقق من إن الموقع HTTPS (المايك مش هيشتغل على HTTP)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        alert("⚠️ عذراً، المحادثة الصوتية تتطلب اتصالاً آمناً (HTTPS). تأكد من الرابط الخاص بك.");
+        return;
+    }
+
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         document.getElementById('joinVoiceBtn').style.display = 'none';
         document.getElementById('muteBtn').style.display = 'inline-block';
         socket.emit('joinVoice', myCode);
-        alert("المايك شغال! اتكلم مع زمايلك");
+        showToast("🎙️ المايك شغال! تقدر تتكلم دلوقتي.");
     } catch (e) {
-        alert("لازم توافق على استخدام المايك");
+        console.error(e);
+        alert("❌ المتصفح منع استخدام المايك. الرجاء إعطاء الصلاحية من إعدادات المتصفح (علامة القفل بجوار الرابط).");
     }
 }
 
@@ -677,9 +846,6 @@ function createPeer(targetId, initiator) {
     return peer;
 }
 
-// 4. إظهار شريط الصوت في الوقت المناسب
-socket.on('roomCreated', () => document.getElementById('voiceChatBar').style.display = 'block');
-socket.on('joinedSuccess', () => document.getElementById('voiceChatBar').style.display = 'block');
 
 // ════════════════════════════════════════════════
 //  Helpers
@@ -696,35 +862,46 @@ function showToast(msg, dur=3000){
     clearTimeout(t._t);
     t._t=setTimeout(()=>{ t.style.display='none'; }, dur);
 }
-
 // 1. عند انتهاء اللعبة بفوز فريق (المافيا أو المواطنين)
 socket.on('gameOver', (msg) => {
     alert("🎮 " + msg);
-    // تنظيف الذاكرة تماماً
-    localStorage.removeItem('mafia_sess'); 
-    // العودة للصفحة الرئيسية "نضيفة" بدون كود قديم
+    SS.clear(); // التعديل هنا
     window.location.href = window.location.origin; 
 });
 
 // 2. في حالة إن "البوس" قفل الغرفة أو السيرفر فصل
 socket.on('roomEnded', () => {
     alert("⚠️ انتهت الجلسة أو تم إغلاق الغرفة من قبل المضيف.");
-    localStorage.removeItem('mafia_sess');
+    SS.clear(); // التعديل هنا
     window.location.href = window.location.origin;
 });
 
 // 3. في حالة حدوث خطأ عام (زي كود غلط أو غرفة مش موجودة)
 socket.on('error', (msg) => {
     alert("❌ خطأ: " + msg);
-    // لو الخطأ متعلق بالغرفة، نضف الذاكرة برضه
     if(msg.includes("انتهت") || msg.includes("غير موجودة")) {
-        localStorage.removeItem('mafia_sess');
+        SS.clear(); // التعديل هنا
         window.location.href = window.location.origin;
     }
 });
-</script>
-<div id="voiceChatBar" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(17, 17, 17, 0.95); padding:15px 10px 30px 10px; border-top:2px solid #d4af37; z-index:9999; text-align:center; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
+
+async function shareRoom() {
+    const url = window.location.origin + '?code=' + myCode;
+    const text = `انضم لجيم المافيا! كود الغرفة: ${myCode}\n${url}`;
     
+    if (navigator.share) {
+        // Web Share API - بيفتح صفحة المشاركة الأصلية (واتس، إنستا، إلخ)
+        try {
+            await navigator.share({ title: 'Mafioso Trial 🕵️', text: text, url: url });
+        } catch(e) {}
+    } else {
+        // fallback: copy to clipboard
+        navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
+    }
+}
+
+</script>
+<div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">    
     <span style="color:gold; font-weight:bold; margin-left:15px; vertical-align: middle;">🎙️ إدارة الحوار:</span>
     
     <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
