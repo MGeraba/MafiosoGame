@@ -159,6 +159,16 @@ body {
 </div>
 <!-- ══════════════════ BOSS LOBBY ══════════════════ -->
 <div id="screen-boss-lobby" class="screen">
+    <!-- QR + Code + Share -->
+    <div class="card">
+        <div id="qrcode"></div>
+        <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
+        
+        <!-- زر المشاركة الجديد -->
+        <button class="btn-blue btn-sm" onclick="shareRoom()" style="margin-bottom:10px; width: 60%;">مشاركة الغرفة 📤</button>
+        
+        <p style="color:#888;font-size:.85em">اللاعبون يسكنوا الـ QR أو يكتبوا الكود</p>
+    </div>
     <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
 
     <!-- QR + Code -->
@@ -210,6 +220,7 @@ body {
 </div>
 <!-- ══════════════════ BOSS IN GAME ══════════════════ -->
 <div id="screen-boss-game" class="screen">
+
     <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
 
     <!-- القصة للبوس -->
@@ -237,11 +248,17 @@ body {
         <h4 style="color:#ff6b6b;margin-bottom:8px">🌀 Plot Twist!</h4>
         <div id="twistText" style="text-align:right;color:#ffb3b3;line-height:1.6;font-style:italic"></div>
     </div>
-
-    <!-- التصويت -->
+<!-- التصويت -->
     <div class="card">
         <h4 style="margin-bottom:8px">📊 نتائج التصويت</h4>
         <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
+        
+        <!-- مربع تصويت البوس للجاسوس -->
+        <div id="bossVoteUI" style="display:none; margin: 15px 0; padding: 10px; border: 1px dashed #d4af37; border-radius: 8px;">
+            <h4 style="color:#ff4d4d; margin-bottom:8px">صوّت من تعتقد أنه الجاسوس:</h4>
+            <div id="bossVBtns"></div>
+        </div>
+
         <hr class="sep">
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
             <button class="btn-green btn-sm" id="btnStartVote" onclick="startVotingPhase()">بدء التصويت 🗳️</button>
@@ -250,7 +267,6 @@ body {
             <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
         </div>
     </div>
-</div>
 
 <!-- ══════════════════ PLAYER IN GAME ══════════════════ -->
 <div id="screen-player-game" class="screen">
@@ -793,6 +809,8 @@ socket.on('gameOver', (msg)=>{
     document.getElementById('resultMsg').innerHTML=msg+'<br><br><button onclick="location.reload()" style="width:auto;padding:10px 24px">العب تاني 🔄</button>';
     document.querySelector('#resultOverlay button:first-of-type').style.display='none';
     overlay.classList.add('active');
+    const bossVoteUI = document.getElementById('bossVoteUI');
+    if(bossVoteUI) bossVoteUI.style.display = 'none';
 });
 
 // ════════════════════════════════════════════════
@@ -1089,8 +1107,7 @@ socket.on('bossSpyData', (d) => {
         };
     }
 });
-
-// اللاعب العادي بيستلم دوره
+// اللاعب العادي بيستلم دوره (الجاسوس)
 socket.on('playerSpyData', (d) => {
     show('screen-player-game');
     document.getElementById('playerContent').innerHTML=`
@@ -1098,7 +1115,7 @@ socket.on('playerSpyData', (d) => {
             <p style="color:#888; font-size:0.8em; margin-bottom:10px;">اضغط على العين لكشف الكلمة/دورك</p>
             <div class="role-container" onclick="toggleRole()">
                 <span style="font-size: 2em;">👁️</span>
-                <span id="mySecretRole" class="role-hidden" style="font-size:1.5em; color:${d.isSpy?'#ff4d4d':'#00ffcc'}!important">${d.roleMsg}</span>
+                <span id="mySecretRole" class="role-hidden ${d.isSpy?'badge-mafia':'badge-civ'}" style="font-size:1.5em;">${d.roleMsg}</span>
             </div>
             <p style="color:#aaa; margin-top:20px; font-size:0.9em;">تناقش مع اللاعبين عبر المايك واسأل أسئلة ذكية لا تكشف الكلمة للجاسوس!</p>
         </div>`;
@@ -1106,24 +1123,46 @@ socket.on('playerSpyData', (d) => {
     document.getElementById('ghostNotice').style.display='none';
 });
 
-// إظهار أزرار التصويت للجاسوس
+// إظهار أزرار التصويت للجميع (بما فيهم البوس)
 socket.on('spyVotingPhase', (targets) => {
-    const vUI = document.getElementById('vUI');
-    const vBtns = document.getElementById('vBtns');
-    vUI.style.display = 'block';
-    vUI.innerHTML = '<h3 style="margin-bottom:10px">من تعتقد أنه الجاسوس؟</h3><div id="vBtns"></div>';
-    
-    const container = document.getElementById('vBtns');
-    targets.forEach(t => {
-        const btn = document.createElement('button');
-        btn.style.width = '45%'; btn.textContent = t;
-        btn.onclick = () => {
-            socket.emit('castSpyVote', { roomCode: myCode, votedForChar: t });
-            vUI.style.display = 'none';
-            showToast('✅ تم تسجيل تصويتك!');
-        };
-        container.appendChild(btn);
-    });
+    // 1. لو لاعب عادي
+    if(!isBoss) {
+        const vUI = document.getElementById('vUI');
+        const container = document.getElementById('vBtns');
+        vUI.style.display = 'block';
+        vUI.innerHTML = '<h3 style="margin-bottom:10px">من تعتقد أنه الجاسوس؟</h3><div id="vBtns"></div>';
+        const newContainer = document.getElementById('vBtns');
+        
+        targets.forEach(t => {
+            const btn = document.createElement('button');
+            btn.style.width = '45%'; btn.textContent = t;
+            btn.onclick = () => {
+                socket.emit('castSpyVote', { roomCode: myCode, votedForChar: t });
+                vUI.style.display = 'none';
+                showToast('✅ تم تسجيل تصويتك!');
+            };
+            newContainer.appendChild(btn);
+        });
+    } 
+    // 2. لو هو البوس
+    else {
+        const bossVoteUI = document.getElementById('bossVoteUI');
+        const bossContainer = document.getElementById('bossVBtns');
+        bossVoteUI.style.display = 'block';
+        bossContainer.innerHTML = ''; // تنظيف الأزرار القديمة
+        
+        targets.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-blue btn-sm';
+            btn.textContent = t;
+            btn.onclick = () => {
+                socket.emit('castSpyVote', { roomCode: myCode, votedForChar: t });
+                bossVoteUI.style.display = 'none';
+                showToast('✅ تم إرسال تصويتك السري!');
+            };
+            bossContainer.appendChild(btn);
+        });
+    }
 });
 
 // لما يمسكوا الجاسوس ويحاول يخمن
@@ -1154,7 +1193,23 @@ function submitSpyGuess() {
     socket.emit('submitSpyGuess', { roomCode: myCode, guess: guess });
     document.getElementById('vUI').style.display = 'none';
 }
-
+// دالة مشاركة الغرفة
+function shareRoom() {
+    const joinUrl = window.location.origin + '?code=' + myCode;
+    const shareText = `تعال العب معايا مافيا وجاسوس! 🕵️‍♂️🔪\nكود الغرفة: ${myCode}`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'لعبة المافيا',
+            text: shareText,
+            url: joinUrl
+        }).catch(err => console.log('مشاركة ملغاة', err));
+    } else {
+        // لو المتصفح مش بيدعم المشاركة، ينسخ الرابط
+        navigator.clipboard.writeText(`${shareText}\nالرابط: ${joinUrl}`);
+        showToast('تم نسخ الكود والرابط للحافظة! 📋');
+    }
+}
 
 </script>
 <div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">    

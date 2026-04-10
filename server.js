@@ -605,3 +605,10 @@ server.listen(PORT, () => {
     console.log(`✅ Server on port ${PORT}`);
     console.log(`🤖 Gemini: ${GEMINI_KEYS.length} keys | Groq: ${GROQ_KEYS.length} keys`);
 });
+// ── حماية السيرفر من الانهيار (لمنع 502 Bad Gateway) ──────────
+process.on('uncaughtException', (err) => {
+    console.error('🔥 Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ Unhandled Rejection:', reason);
+});
