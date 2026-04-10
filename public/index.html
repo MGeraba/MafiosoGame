@@ -587,24 +587,30 @@ socket.on('gameData', (d)=>{
 
 function restorePlayerScreen(d, alreadyVoted, isAlive){
     show('screen-player-game');
-    const isMafia=d.role.includes('🔪');
+    
+    // حماية ضد البيانات المفقودة (عشان الشاشة متسودش أبداً)
+    const roleStr = d.role || 'مواطن';
+    const isMafia = roleStr.includes('🔪');
+    const safeCharName = d.charName || 'شخصية غامضة';
+    const safeStory = d.story || 'القصة قيد التحضير...';
+    const safeSecret = d.charSecret || 'أنت تحاول البقاء على قيد الحياة بكل الطرق الممكنة.';
+
     document.getElementById('playerContent').innerHTML=`
         <div class="card">
-            <h2 style="color:#d4af37;margin-bottom:6px">${d.charName}</h2>
-            <div class="story-box">${d.story}</div>
+            <h2 style="color:#d4af37;margin-bottom:6px">${safeCharName}</h2>
+            <div class="story-box">${safeStory}</div>
             
             <div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
                 <span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span>
-                <p style="color:#00ffcc;margin-top:4px">${d.charSecret}</p>
+                <p style="color:#00ffcc;margin-top:4px">${safeSecret}</p>
             </div>
             
             <p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>
             <div class="role-container" onclick="toggleRole()">
                 <span style="font-size: 1.8em;">👁️</span>
-                <span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':'badge-civ'}">${d.role}</span>
+                <span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':'badge-civ'}">${roleStr}</span>
             </div>
             
-            <!-- مكان أدلة البوس لما يبعتها -->
             <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">
                 <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>
                 <div id="playerCluesList"></div>
@@ -612,9 +618,6 @@ function restorePlayerScreen(d, alreadyVoted, isAlive){
         </div>`;
 
     const ghostDiv=document.getElementById('ghostNotice');
-    
-    // ⬇️ التعديل المهم هنا ⬇️
-    // نخفي صندوق التصويت دائماً في بداية الجولة أو عند إعادة التحميل
     document.getElementById('vUI').style.display='none';
     
     if(!isAlive){
@@ -624,7 +627,6 @@ function restorePlayerScreen(d, alreadyVoted, isAlive){
         if(alreadyVoted){
             showToast('✅ صوتك اتسجل في هذه الجولة');
         }
-        // مسحنا السطر اللي كان بيعرض التصويت تلقائي
     }
 }
 
@@ -1193,21 +1195,70 @@ function submitSpyGuess() {
     socket.emit('submitSpyGuess', { roomCode: myCode, guess: guess });
     document.getElementById('vUI').style.display = 'none';
 }
-// دالة مشاركة الغرفة
-function shareRoom() {
-    const joinUrl = window.location.origin + '?code=' + myCode;
-    const shareText = `تعال العب معايا مافيا وجاسوس! 🕵️‍♂️🔪\nكود الغرفة: ${myCode}`;
-    
-    if (navigator.share) {
-        navigator.share({
-            title: 'لعبة المافيا',
-            text: shareText,
-            url: joinUrl
-        }).catch(err => console.log('مشاركة ملغاة', err));
-    } else {
-        // لو المتصفح مش بيدعم المشاركة، ينسخ الرابط
-        navigator.clipboard.writeText(`${shareText}\nالرابط: ${joinUrl}`);
-        showToast('تم نسخ الكود والرابط للحافظة! 📋');
+// دالة مشاركة الغرفة (صورة الكيو آر + الكود)
+async function shareRoom() {
+    try {
+        const qrDiv = document.getElementById('qrcode');
+        // الحصول على الكيو آر كود (سواء كان مرسوم كـ Canvas أو Image)
+        const qrElement = qrDiv.querySelector('canvas') || qrDiv.querySelector('img');
+        
+        if (!qrElement) {
+            showToast('انتظر حتى يتم تحميل الكود ⏳');
+            return;
+        }
+
+        // إنشاء لوحة رسم (Canvas) جديدة لدمج الصورة مع النص
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // تحديد حجم الصورة (مساحة بيضاء أكبر عشان نكتب تحتها)
+        canvas.width = 250;
+        canvas.height = 320;
+        
+        // رسم خلفية بيضاء
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // رسم الكيو آر كود في المنتصف
+        ctx.drawImage(qrElement, 25, 20, 200, 200);
+        
+        // كتابة كود الغرفة تحت الكيو آر كود
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 35px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(myCode, canvas.width / 2, 270);
+        
+        // كتابة نص تشجيعي صغير
+        ctx.fillStyle = '#555555';
+        ctx.font = '18px Arial';
+        ctx.fillText('امسح الكود أو اكتبه للدخول', canvas.width / 2, 300);
+
+        // تحويل اللوحة إلى ملف صورة
+        canvas.toBlob(async (blob) => {
+            const file = new File([blob], 'Mafia_Room_Code.png', { type: 'image/png' });
+            const shareText = `تعال العب معايا مافيا وجاسوس! 🕵️‍♂️🔪\nالرابط: ${window.location.origin}?code=${myCode}`;
+
+            // التحقق إذا كان الموبايل يدعم مشاركة الصور (زي الواتساب)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: 'كود غرفة المافيا',
+                    text: shareText,
+                    files: [file]
+                });
+            } else {
+                // لو المتصفح (زي الكمبيوتر) مابيدعمش، هيحمل الصورة وينسخ الرابط
+                const link = document.createElement('a');
+                link.download = `Mafia_Room_${myCode}.png`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                navigator.clipboard.writeText(shareText);
+                showToast('تم تحميل الصورة ونسخ الرابط! 🖼️📋');
+            }
+        }, 'image/png');
+        
+    } catch (err) {
+        console.error('خطأ في المشاركة:', err);
+        showToast('حدث خطأ أثناء المشاركة ❌');
     }
 }
 

@@ -294,9 +294,14 @@ io.on('connection', (socket) => {
         shuffled.slice(0, mafiaCount).forEach(p => { p.role = 'مافيوسو 🔪'; });
 
         room.players.forEach(p => {
-            const assign = scenario.assignments?.find(a => a.name === p.name);
+            // لو الذكاء الاصطناعي بعت مصفوفة الأدوار
+            let assign = null;
+            if (scenario && Array.isArray(scenario.assignments)) {
+                assign = scenario.assignments.find(a => a.name === p.name);
+            }
+            // لو ملقاش دور مخصص، بيحط الاسم الحقيقي كاسم شخصية
             p.charName = assign?.charName || p.name;
-            p.secret   = assign?.secret   || "لا يوجد سر";
+            p.secret   = assign?.secret   || "أنت تحاول البقاء على قيد الحياة ومساعدة فريقك.";
         });
 
         // إرسال للاعبين
