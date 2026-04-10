@@ -456,12 +456,23 @@ function startGame() {
         spyCount: spyCnt
     });
 }
+// في حالة حدوث خطأ عام (زي كود غلط أو AI هنج)
 socket.on('error', (msg) => {
-            alert("⚠️ " + msg);
-            // إرجاع زر البدء لحالته الطبيعية لو كان معلق
-            const startBtn = document.getElementById('startBtn');
-            if(startBtn) startBtn.innerText = "ابدأ الجيم 🚀";
-        });
+    alert("❌ " + msg);
+    
+    // إرجاع زر البدء لحالته الطبيعية لو كان معلق
+    const startBtn = document.getElementById('startBtn');
+    if(startBtn) {
+        startBtn.textContent = 'ابدأ الجيم 🚀';
+        startBtn.disabled = false;
+    }
+
+    if(msg.includes("انتهت") || msg.includes("غير موجودة")) {
+        SS.clear();
+        window.location.href = window.location.origin;
+    }
+});
+
 // ════════════════════════════════════════════════
 //  Boss Game Data
 // ════════════════════════════════════════════════
