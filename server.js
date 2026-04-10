@@ -3,9 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const classicMafia = require('./classicMafia'); // استدعاء ملف الكلاسيك
 
-const spyGame = require('./spyGame'); // إضااافة ملف الجاسوس
 const app = express();
 const server = http.createServer(app);
 
@@ -227,24 +225,8 @@ io.on('connection', (socket) => {
     socket.on('startGame', async (data) => {
         const room = rooms[data.roomCode];
         if (!room || room.players.length === 0) return;
-        
-        if (data.mode === 'classic') {
-            room.started = true;
-            classicMafia.startGame(io, room, data.roomCode);
-            return;
-        }
-
-        if (data.mode === 'spy') {
-            room.started = true;
-            // نمرر دالة getAIResponse عشان ملف الجاسوس يقدر يستخدم الذكاء الاصطناعي بتاعنا
-            spyGame.startGame(io, room, data.roomCode, data, getAIResponse);
-            return;
-        }
-
-        // --- باقي كود الذكاء الاصطناعي للمافيوسو كما هو أسفل هذا السطر ---
         room.started = true;
         room.clues = [];
-        // ... (باقي كود الـ prompt و الـ AI اللي عندك)
 
         const names = room.players.map(p => p.name).join(', ');
         const prompt = `أنت مؤلف لعبة مافيا محترف باللهجة المصرية. اللاعبون هم: [${names}]. 
@@ -294,14 +276,9 @@ io.on('connection', (socket) => {
         shuffled.slice(0, mafiaCount).forEach(p => { p.role = 'مافيوسو 🔪'; });
 
         room.players.forEach(p => {
-            // لو الذكاء الاصطناعي بعت مصفوفة الأدوار
-            let assign = null;
-            if (scenario && Array.isArray(scenario.assignments)) {
-                assign = scenario.assignments.find(a => a.name === p.name);
-            }
-            // لو ملقاش دور مخصص، بيحط الاسم الحقيقي كاسم شخصية
+            const assign = scenario.assignments?.find(a => a.name === p.name);
             p.charName = assign?.charName || p.name;
-            p.secret   = assign?.secret   || "أنت تحاول البقاء على قيد الحياة ومساعدة فريقك.";
+            p.secret   = assign?.secret   || "لا يوجد سر";
         });
 
         // إرسال للاعبين
@@ -549,42 +526,6 @@ io.on('connection', (socket) => {
     socket.on('webrtc-ice-candidate', (data) => {
         io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
     });
-   // ── أحداث لعبة المافيا الكلاسيكية ─────────────────────────────
-    socket.on('mafiaSubmitKill', (data) => {
-        const room = rooms[data.roomCode];
-        if (room && room.mode === 'classic') {
-            classicMafia.handleMafiaVote(io, room, data.roomCode, socket.id, data.target);
-        }
-    });
-
-    socket.on('doctorSubmitSave', (data) => {
-        const room = rooms[data.roomCode];
-        if (room && room.mode === 'classic') {
-            classicMafia.handleDoctorSave(io, room, data.roomCode, data.target);
-        }
-    });
-// ── أحداث لعبة الجاسوس ─────────────────────────────────────
-    socket.on('startSpyVoting', (roomCode) => {
-        const room = rooms[roomCode];
-        if (room && room.mode === 'spy') {
-            spyGame.startVoting(io, room, roomCode);
-        }
-    });
-
-    socket.on('castSpyVote', (data) => {
-        const room = rooms[data.roomCode];
-        if (room && room.mode === 'spy') {
-            spyGame.handleVote(io, room, data.roomCode, socket.id, data.votedForChar);
-        }
-    });
-
-    socket.on('submitSpyGuess', (data) => {
-        const room = rooms[data.roomCode];
-        if (room && room.mode === 'spy') {
-            spyGame.handleSpyGuess(io, room, data.roomCode, data.guess);
-        }
-    });
-
     socket.on('disconnect', () => {
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
@@ -603,17 +544,8 @@ io.on('connection', (socket) => {
     });
     });
 
- 
-
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`✅ Server on port ${PORT}`);
     console.log(`🤖 Gemini: ${GEMINI_KEYS.length} keys | Groq: ${GROQ_KEYS.length} keys`);
-});
-// ── حماية السيرفر من الانهيار (لمنع 502 Bad Gateway) ──────────
-process.on('uncaughtException', (err) => {
-    console.error('🔥 Uncaught Exception:', err);
-});
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ Unhandled Rejection:', reason);
 });
