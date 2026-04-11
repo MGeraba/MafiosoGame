@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -6,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mafioso Trial 🕵️</title>
     <script src="/socket.io/socket.io.js"></script>
-    <!-- QR Code library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
@@ -73,158 +71,152 @@
         .btn-gray{background:#444!important;color:#fff!important}
         .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
 
+        body { padding-bottom: 100px !important; }
 
-        #voiceChatBar { z-index: 99999 !important; display: block !important; }
+        /* ── Ghost Chat ══ */
+        .ghost-chat {
+            position: fixed;
+            bottom: 100px;
+            right: 10px;
+            width: 280px;
+            max-height: 300px;
+            background: #0a0a0a;
+            border: 1px solid #555;
+            border-radius: 12px;
+            display: none;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .ghost-chat.active {
+            display: flex;
+        }
+        .ghost-chat-header {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 12px 12px 0 0;
+            color: #888;
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ghost-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            max-height: 200px;
+        }
+        .ghost-chat-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #333;
+        }
+        .ghost-chat-input input {
+            flex: 1;
+            margin: 0;
+            margin-left: 8px;
+        }
+        .ghost-msg {
+            margin: 4px 0;
+            padding: 6px 10px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        .ghost-msg-name {
+            color: #d4af37;
+            font-size: 0.8em;
+            margin-bottom: 2px;
+        }
+        .ghost-msg-text {
+            color: #aaa;
+        }
 
-        /* ── حل مشكلة الشريط السفلي ── */
-body {
-    padding-bottom: 100px !important; /* مساحة كافية تحت عشان الشريط ميغطيش حاجة */
-}
-/* ══ Ghost Chat ══ */
-.ghost-chat {
-    position: fixed;
-    bottom: 100px;
-    right: 10px;
-    width: 280px;
-    max-height: 300px;
-    background: #0a0a0a;
-    border: 1px solid #555;
-    border-radius: 12px;
-    display: none;
-    flex-direction: column;
-    z-index: 100;
-}
-.ghost-chat.active {
-    display: flex;
-}
-.ghost-chat-header {
-    background: #1a1a1a;
-    padding: 10px;
-    border-radius: 12px 12px 0 0;
-    color: #888;
-    font-size: 0.85em;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.ghost-chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-    max-height: 200px;
-}
-.ghost-chat-input {
-    display: flex;
-    padding: 10px;
-    border-top: 1px solid #333;
-}
-.ghost-chat-input input {
-    flex: 1;
-    margin: 0;
-    margin-left: 8px;
-}
-.ghost-msg {
-    margin: 4px 0;
-    padding: 6px 10px;
-    background: #1a1a1a;
-    border-radius: 8px;
-    font-size: 0.9em;
-}
-.ghost-msg-name {
-    color: #d4af37;
-    font-size: 0.8em;
-    margin-bottom: 2px;
-}
-.ghost-msg-text {
-    color: #aaa;
-}
-/* ── إخفاء وإظهار الدور (العين) ── */
-.role-hidden {
-    color: transparent !important;
-    background-color: #333 !important;
-    text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
-    border-color: #555 !important;
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.3s ease;
-}
-.role-visible {
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.3s ease;
-}
-.role-container {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 10px;
-    background: #1a1a1a;
-    padding: 10px 20px;
-    border-radius: 10px;
-    border: 1px dashed #555;
-}
-/* ══ Timer Component ══ */
-.timer-container {
-    position: fixed;
-    top: 50px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1a0a0a;
-    border: 2px solid #d4af37;
-    border-radius: 12px;
-    padding: 10px 20px;
-    z-index: 1000;
-    display: none;
-    box-shadow: 0 4px 20px rgba(212,175,55,0.3);
-}
-.timer-container.active {
-    display: block;
-    animation: pulseTimer 1s infinite;
-}
-@keyframes pulseTimer {
-    0%, 100% { box-shadow: 0 4px 20px rgba(212,175,55,0.3); }
-    50% { box-shadow: 0 4px 30px rgba(212,175,55,0.6); }
-}
-.timer-bar {
-    width: 200px;
-    height: 6px;
-    background: #333;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 8px;
-}
-.timer-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #d4af37, #ff6b35);
-    border-radius: 3px;
-    transition: width 1s linear;
-}
-.timer-text {
-    color: #d4af37;
-    font-weight: bold;
-    font-size: 1.2em;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.timer-label {
-    font-size: 0.7em;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-.timer-urgent {
-    color: #ff4d4d !important;
-    animation: blink 0.5s infinite;
-}
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-    
-    
-    
+        /* ── Role Toggle ── */
+        .role-hidden {
+            color: transparent !important;
+            background-color: #333 !important;
+            text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+            border-color: #555 !important;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+        .role-visible {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+        .role-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            background: #1a1a1a;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px dashed #555;
+        }
+
+        /* ── Timer ── */
+        .timer-container {
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a0a0a;
+            border: 2px solid #d4af37;
+            border-radius: 12px;
+            padding: 10px 20px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 20px rgba(212,175,55,0.3);
+        }
+        .timer-container.active {
+            display: block;
+            animation: pulseTimer 1s infinite;
+        }
+        @keyframes pulseTimer {
+            0%, 100% { box-shadow: 0 4px 20px rgba(212,175,55,0.3); }
+            50% { box-shadow: 0 4px 30px rgba(212,175,55,0.6); }
+        }
+        .timer-bar {
+            width: 200px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .timer-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #d4af37, #ff6b35);
+            border-radius: 3px;
+            transition: width 1s linear;
+        }
+        .timer-text {
+            color: #d4af37;
+            font-weight: bold;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .timer-label {
+            font-size: 0.7em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .timer-urgent {
+            color: #ff4d4d !important;
+            animation: blink 0.5s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -260,6 +252,7 @@ body {
 
 <!-- Connection Bar -->
 <div id="conn-bar"></div>
+
 <!-- Timer Component -->
 <div id="timerContainer" class="timer-container">
     <div class="timer-text">
@@ -270,11 +263,12 @@ body {
         <div id="timerFill" class="timer-fill" style="width: 100%"></div>
     </div>
 </div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
 <!-- ══════════════════ HOME ══════════════════ -->
-<div id="screen-home" class="screen">
+<div id="screen-home" class="screen" style="display:block">
     <h1>🕵️‍♂️ MAFIOSO TRIAL</h1>
 
     <!-- اختيار اللعبة -->
@@ -450,6 +444,57 @@ const SS = {
 };
 
 // ════════════════════════════════════════════════
+//  Timer System
+// ════════════════════════════════════════════════
+let timerInterval = null;
+let timeLeft = 0;
+let totalTime = 0;
+
+function startTimer(seconds, label, onComplete) {
+    clearInterval(timerInterval);
+    timeLeft = seconds;
+    totalTime = seconds;
+    
+    const container = document.getElementById('timerContainer');
+    const valueEl = document.getElementById('timerValue');
+    const labelEl = document.getElementById('timerLabel');
+    const fillEl = document.getElementById('timerFill');
+    
+    container.classList.add('active');
+    labelEl.textContent = label;
+    valueEl.textContent = seconds;
+    valueEl.classList.remove('timer-urgent');
+    fillEl.style.width = '100%';
+    fillEl.style.background = 'linear-gradient(90deg, #d4af37, #ff6b35)';
+    
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        valueEl.textContent = timeLeft;
+        
+        // Progress bar
+        const percentage = (timeLeft / totalTime) * 100;
+        fillEl.style.width = percentage + '%';
+        
+        // Urgent color
+        if(timeLeft <= 5) {
+            valueEl.classList.add('timer-urgent');
+            fillEl.style.background = '#ff4d4d';
+        }
+        
+        if(timeLeft <= 0) {
+            clearInterval(timerInterval);
+            container.classList.remove('active');
+            if(onComplete) onComplete();
+        }
+    }, 1000);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+    document.getElementById('timerContainer').classList.remove('active');
+}
+
+// ════════════════════════════════════════════════
 //  Connection
 // ════════════════════════════════════════════════
 const connBar = document.getElementById('conn-bar');
@@ -550,6 +595,7 @@ socket.on('joinedSuccess', (data)=>{
         document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
     }
 });
+
 // ════════════════════════════════════════════════
 //  Ghost Chat System
 // ════════════════════════════════════════════════
@@ -573,7 +619,7 @@ socket.on('ghostMessage', (d) => {
         const container = document.getElementById('ghostChatMessages');
         const div = document.createElement('div');
         div.className = 'ghost-msg';
-        div.innerHTML = `<div class="ghost-msg-name">${d.name}</div><div class="ghost-msg-text">${d.message}</div>`;
+        div.innerHTML = '<div class="ghost-msg-name">' + d.name + '</div><div class="ghost-msg-text">' + d.message + '</div>';
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
         
@@ -582,11 +628,6 @@ socket.on('ghostMessage', (d) => {
     }
 });
 
-// في restorePlayerScreen، لو ميت نفتح الشات:
-// ضيف في نهاية restorePlayerScreen:
-if(!alive) {
-    document.getElementById('ghostChat').classList.add('active');
-}
 // ════════════════════════════════════════════════
 //  Players List (Boss Lobby)
 // ════════════════════════════════════════════════
@@ -599,8 +640,8 @@ function updatePlayerList(players){
         document.getElementById('startBtn').style.display='none';
         return;
     }
-    list.innerHTML=players.map(p=>`<span class="player-tag">👤 ${p.name}</span>`).join('');
-    cnt.textContent=`✅ ${players.length} لاعب جاهز`;
+    list.innerHTML=players.map(p=>'<span class="player-tag">👤 '+p.name+'</span>').join('');
+    cnt.textContent='✅ '+players.length+' لاعب جاهز';
     document.getElementById('startBtn').style.display='block';
 }
 socket.on('updatePlayers', updatePlayerList);
@@ -619,11 +660,10 @@ function startGame(){
     });
 }
 socket.on('error', (msg) => {
-            alert("⚠️ " + msg);
-            // إرجاع زر البدء لحالته الطبيعية لو كان معلق
-            const startBtn = document.getElementById('startBtn');
-            if(startBtn) startBtn.innerText = "ابدأ الجيم 🚀";
-        });
+    alert("⚠️ " + msg);
+    const startBtn = document.getElementById('startBtn');
+    if(startBtn) startBtn.innerText = "ابدأ الجيم 🚀";
+});
 // ════════════════════════════════════════════════
 //  Boss Game Data
 // ════════════════════════════════════════════════
@@ -635,7 +675,7 @@ socket.on('bossData', (d)=>{
 
 function renderBossSecrets(players){
     document.getElementById('bossSecrets').innerHTML=players.map(p=>
-        `<p><b style="color:#d4af37">${p.name}</b> ← <span style="color:#aaa">${p.charName}</span> — <span class="${p.role.includes('🔪')?'badge-mafia':'badge-civ'}">${p.role}</span></p>`
+        '<p><b style="color:#d4af37">'+p.name+'</b> ← <span style="color:#aaa">'+p.charName+'</span> — <span class="'+(p.role.includes('🔪')?'badge-mafia':'badge-civ')+'">'+p.role+'</span></p>'
     ).join('');
 }
 
@@ -644,13 +684,12 @@ function renderBossSecrets(players){
 // ════════════════════════════════════════════════
 function addClue(clueObj){
     const panel=document.getElementById('clues-panel');
-    if(panel.querySelector('p')) panel.innerHTML=''; // مسح كلمة "جاري التوليد"
+    if(panel.querySelector('p')) panel.innerHTML='';
     
     const div=document.createElement('div');
     div.className='clue-item';
-    div.innerHTML=`<div class="clue-meta">جولة ${clueObj.round} — ${clueObj.time}</div><div class="clue-text">🔍 ${clueObj.text}</div>`;
+    div.innerHTML='<div class="clue-meta">جولة '+clueObj.round+' — '+clueObj.time+'</div><div class="clue-text">🔍 '+clueObj.text+'</div>';
     
-    // إضافة زر الإرسال لو اللي فاتح هو البوس
     if(isBoss) {
         const btn = document.createElement('button');
         btn.className = 'btn-gray btn-sm';
@@ -676,10 +715,7 @@ socket.on('clueShared', (clueObj) => {
         const list = document.getElementById('playerCluesList');
         if(cluesContainer && list) {
             cluesContainer.style.display = 'block';
-            list.innerHTML += `<div style="border-bottom:1px solid #2d6a2d; padding-bottom:5px; margin-bottom:5px;">
-                <span style="font-size:0.7em; color:#888;">جولة ${clueObj.round}:</span> 
-                <span style="color:#7fff7f; font-size:0.95em;">${clueObj.text}</span>
-            </div>`;
+            list.innerHTML += '<div style="border-bottom:1px solid #2d6a2d; padding-bottom:5px; margin-bottom:5px;"><span style="font-size:0.7em; color:#888;">جولة '+clueObj.round+':</span> <span style="color:#7fff7f; font-size:0.95em;">'+clueObj.text+'</span></div>';
             showToast('📢 البوس أرسل دليلاً جديداً، اقرأه الآن!', 5000);
         }
     }
@@ -691,11 +727,7 @@ socket.on('twistShared', (twist) => {
         const list = document.getElementById('playerCluesList');
         if(cluesContainer && list) {
             cluesContainer.style.display = 'block';
-            list.innerHTML += `
-            <div style="border-bottom:1px dashed #ff6b6b; padding-bottom:8px; margin-bottom:8px; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px;">
-                <span style="font-size:0.85em; color:#ff6b6b; font-weight:bold;">🚨 حدث مفاجئ (Plot Twist):</span><br>
-                <span style="color:#ffb3b3; font-size:1em; font-style:italic;">${twist}</span>
-            </div>`;
+            list.innerHTML += '<div style="border-bottom:1px dashed #ff6b6b; padding-bottom:8px; margin-bottom:8px; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px;"><span style="font-size:0.85em; color:#ff6b6b; font-weight:bold;">🚨 حدث مفاجئ (Plot Twist):</span><br><span style="color:#ffb3b3; font-size:1em; font-style:italic;">'+twist+'</span></div>';
             showToast('🚨 البوس أرسل حدثاً مفاجئاً، انتبه!', 5000);
         }
     }
@@ -720,61 +752,53 @@ socket.on('gameData', (d)=>{
     restorePlayerScreen(d, false, d.isAlive);
 });
 
-function restorePlayerScreen(d, alreadyVoted, alive){
+function restorePlayerScreen(d, alreadyVoted, aliveStatus){
     show('screen-player-game');
     const isMafia=d.role.includes('🔪');
-    isAlive = alive;
-    isGhost = !alive; // ← جديد: علم إنك ميت
+    isAlive = aliveStatus;
+    isGhost = !aliveStatus;
     
     let roleDisplay = '';
     let secretDisplay = '';
     
     // لو ميت، شوف كل حاجة (Spectator Mode)
-    if(!alive){
-        roleDisplay = `<span class="badge-civ">👻 شبح (متفرج)</span>`;
-        secretDisplay = `<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
-            <span style="color:#666;font-size:.8em">🎭 دورك الأصلي كان:</span>
-            <p style="color:#d4af37;margin-top:4px;font-weight:bold">${d.role}</p>
-        </div>`;
+    if(!aliveStatus){
+        roleDisplay = '<span class="badge-civ">👻 شبح (متفرج)</span>';
+        secretDisplay = '<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🎭 دورك الأصلي كان:</span><p style="color:#d4af37;margin-top:4px;font-weight:bold">'+d.role+'</p></div>';
     } else {
         // لو عايش، الدور مخفي
-        roleDisplay = `<span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':'badge-civ'}">${d.role}</span>`;
-        secretDisplay = `<div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
-            <span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span>
-            <p style="color:#00ffcc;margin-top:4px">${d.charSecret}</p>
-        </div>`;
+        roleDisplay = '<span id="mySecretRole" class="role-hidden '+(isMafia?'badge-mafia':'badge-civ')+'">'+d.role+'</span>';
+        secretDisplay = '<div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span><p style="color:#00ffcc;margin-top:4px">'+d.charSecret+'</p></div>';
     }
     
-    document.getElementById('playerContent').innerHTML=`
-        <div class="card">
-            <h2 style="color:#d4af37;margin-bottom:6px">${d.charName}</h2>
-            <div class="story-box">${d.story}</div>
-            
-            ${secretDisplay}
-            
-            ${alive ? `<p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>
-            <div class="role-container" onclick="toggleRole()">
-                <span style="font-size: 1.8em;">👁️</span>
-                ${roleDisplay}
-            </div>` : `<div class="role-container" style="border-color:#555;">
-                <span style="font-size: 1.8em;">👻</span>
-                ${roleDisplay}
-            </div>
-            <p style="color:#888;font-size:.8em;margin-top:10px;">أنت الآن متفرج، تقدر تشوف كل الأدوار!</p>`}
-            
-            <!-- مكان أدلة البوس -->
-            <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">
-                <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>
-                <div id="playerCluesList"></div>
-            </div>
-        </div>`;
+    document.getElementById('playerContent').innerHTML='\
+        <div class="card">\
+            <h2 style="color:#d4af37;margin-bottom:6px">'+d.charName+'</h2>\
+            <div class="story-box">'+d.story+'</div>\
+            '+secretDisplay+'\
+            '+(aliveStatus ? '<p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>\
+            <div class="role-container" onclick="toggleRole()">\
+                <span style="font-size: 1.8em;">👁️</span>\
+                '+roleDisplay+'\
+            </div>' : '<div class="role-container" style="border-color:#555;">\
+                <span style="font-size: 1.8em;">👻</span>\
+                '+roleDisplay+'\
+            </div>\
+            <p style="color:#888;font-size:.8em;margin-top:10px;">أنت الآن متفرج، تقدر تشوف كل الأدوار!</p>')+'\
+            <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">\
+                <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>\
+                <div id="playerCluesList"></div>\
+            </div>\
+        </div>';
 
     const ghostDiv=document.getElementById('ghostNotice');
     document.getElementById('vUI').style.display='none';
     
-    if(!alive){
+    if(!aliveStatus){
         ghostDiv.style.display='block';
-        // ← Spectator Mode: نطلب من السيرفر يبعتنا كل الأدوار
+        // فتح شات الأشباح
+        document.getElementById('ghostChat').classList.add('active');
+        // Spectator Mode: نطلب من السيرفر يبعتنا كل الأدوار
         socket.emit('requestSpectatorData', myCode);
     } else {
         ghostDiv.style.display='none';
@@ -796,13 +820,12 @@ function toggleRole() {
 // ════════════════════════════════════════════════
 //  Voting
 // ════════════════════════════════════════════════
-function renderVoteButtons(chars, isGhost){
+function renderVoteButtons(chars, ghostVoting){
     const vUI=document.getElementById('vUI');
     const ghostDiv=document.getElementById('ghostNotice');
     const ghostVoteSec=document.getElementById('ghostVoteSection');
     const vBtns=document.getElementById('vBtns');
 
-    // لو البوس قفل التصويت أو مفيش أسماء
     if(!chars || chars.length===0){
         vUI.style.display='none';
         if(ghostVoteSec) ghostVoteSec.innerHTML = '';
@@ -810,7 +833,7 @@ function renderVoteButtons(chars, isGhost){
     }
 
     // تصويت الميتين (حالة الـ 1v1)
-    if(isGhost){
+    if(ghostVoting){
         ghostDiv.style.display='block';
         ghostVoteSec.innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — ساعد المدينة! حدد مين المافيوسو:</p>';
         chars.forEach(char=>{
@@ -824,7 +847,7 @@ function renderVoteButtons(chars, isGhost){
             };
             ghostVoteSec.appendChild(btn);
         });
-        vUI.style.display='none'; // تأكيد إخفاء تصويت الأحياء
+        vUI.style.display='none';
     } 
     // تصويت الأحياء العادي
     else {
@@ -847,16 +870,12 @@ function renderVoteButtons(chars, isGhost){
 socket.on('voteResultUpdate', (d)=>{
     let s='';
     for(let k in d.details)
-        s+=`<p style="text-align:right">${k}: <b style="color:#d4af37">${d.details[k]}</b> أصوات</p>`;
-    s+=`<p style="color:#555;font-size:.8em;text-align:right">إجمالي: ${d.totalVotes}</p>`;
+        s+='<p style="text-align:right">'+k+': <b style="color:#d4af37">'+d.details[k]+'</b> أصوات</p>';
+    s+='<p style="color:#555;font-size:.8em;text-align:right">إجمالي: '+d.totalVotes+'</p>';
     document.getElementById('vStats').innerHTML=s;
 });
 
 socket.on('nextRound', (data)=>{
-    const sess=SS.load();
-    const newGameData=sess.gameData?{...sess.gameData, allCharNames:data.chars}:sess.gameData;
-    SS.save({...sess, hasVoted:false, gameData:newGameData, isAlive:!data.isGhost&&data.canVote?sess.isAlive:sess.isAlive});
-
     if(!isBoss){
         if(data.canVote && data.chars.length>0){
             renderVoteButtons(data.chars, data.isGhost||false);
@@ -905,24 +924,17 @@ socket.on('panicAction', ()=>{
     },1000);
 });
 
-// Plot Twist يوصل للبوس فقط
-// Plot Twist يوصل للبوس فقط ومعه زر الإرسال
 socket.on('panicTwist', (twist)=>{
     const card=document.getElementById('twistCard');
     const txt=document.getElementById('twistText');
     card.style.display='block';
     
-    // تنظيف النص من علامات الاقتباس اللي ممكن تبوظ الكود
     const safeTwist = twist.replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
-    txt.innerHTML = `
-        <span style="font-size:1.1em">${twist}</span><br>
-        <button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist('${safeTwist}')">إرسال التويست للاعبين 📢</button>
-    `;
+    txt.innerHTML = '<span style="font-size:1.1em">'+twist+'</span><br><button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist(\''+safeTwist+'\')">إرسال التويست للاعبين 📢</button>';
     showToast('🌀 Plot Twist تم توليده!', 3000);
 });
 
-// دالة إرسال التويست
 function sharePlotTwist(twistText) {
     socket.emit('shareTwist', { roomCode: myCode, twist: twistText });
     document.getElementById('shareTwistBtn').disabled = true;
@@ -944,7 +956,6 @@ socket.on('executionResult', (d)=>{
     document.getElementById('resultIcon').textContent=d.isMafia?'🎯':'😢';
     document.getElementById('resultMsg').textContent=d.message;
     overlay.classList.add('active');
-    // لو اللعبة انتهت، مش نخلي ينقر حسناً
     if(d.gameOver) document.querySelector('#resultOverlay button').textContent='ممتاز!';
 });
 
@@ -985,7 +996,6 @@ socket.on('votingStarted', () => {
     showToast('تم فتح باب التصويت للاعبين!', 3000);
 });
 
-// عشان نرجع الزر لطبيعته بعد الإعدام أو في الجولة الجديدة
 socket.on('executionResult', () => {
     const btn = document.getElementById('btnStartVote');
     if(btn) {
@@ -997,7 +1007,6 @@ socket.on('executionResult', () => {
 
 socket.on('phaseTimer', (d) => {
     startTimer(d.seconds, d.label, () => {
-        // لما الوقت يخلص
         if(d.phase === 'voting') {
             showToast('⏰ انتهى وقت التصويت!');
         }
@@ -1022,85 +1031,13 @@ window.addEventListener('load', ()=>{
     }
     // نشوف لو فيه session قديمة
     const sess=SS.load();
-    if(!sess.code) show('screen-home');
+    if(!sess.code) {
+        show('screen-home');
+    } else if(!sess._connected) {
+        show('screen-home');
+    }
     // لو فيه session هيتعالج في socket.on('connect')
-    else if(!sess._connected) show('screen-home'); // لو لم يتصل قبل كده، ابدأ من الأول
 });
-// 📡 متغيرات المحادثة الصوتية
-let localStream;
-let peers = {};
-const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-// 1. تشغيل المايك
-
-async function initVoiceChat() {
-    // التحقق من إن الموقع HTTPS (المايك مش هيشتغل على HTTP)
-    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-        alert("⚠️ عذراً، المحادثة الصوتية تتطلب اتصالاً آمناً (HTTPS). تأكد من الرابط الخاص بك.");
-        return;
-    }
-
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        document.getElementById('joinVoiceBtn').style.display = 'none';
-        document.getElementById('muteBtn').style.display = 'inline-block';
-        socket.emit('joinVoice', myCode);
-        showToast("🎙️ المايك شغال! تقدر تتكلم دلوقتي.");
-    } catch (e) {
-        console.error(e);
-        alert("❌ المتصفح منع استخدام المايك. الرجاء إعطاء الصلاحية من إعدادات المتصفح (علامة القفل بجوار الرابط).");
-    }
-}
-
-// 2. كتم/فتح الصوت
-function toggleMute() {
-    const track = localStream.getAudioTracks()[0];
-    track.enabled = !track.enabled;
-    document.getElementById('muteBtn').innerText = track.enabled ? "كتم الصوت 🔇" : "فتح الصوت 🔊";
-}
-
-// 3. الربط بين اللاعبين (Signaling)
-socket.on('user-joined-voice', (userId) => {
-    if (localStream) createPeer(userId, true);
-});
-
-socket.on('webrtc-offer', async (data) => {
-    if (!localStream) return;
-    const peer = createPeer(data.sender, false);
-    await peer.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    const answer = await peer.createAnswer();
-    await peer.setLocalDescription(answer);
-    socket.emit('webrtc-answer', { target: data.sender, sdp: answer });
-});
-
-socket.on('webrtc-answer', (data) => {
-    if (peers[data.sender]) peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp));
-});
-
-socket.on('webrtc-ice-candidate', (data) => {
-    if (peers[data.sender]) peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
-});
-
-function createPeer(targetId, initiator) {
-    const peer = new RTCPeerConnection(rtcConfig);
-    peers[targetId] = peer;
-    localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
-    peer.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
-    peer.ontrack = e => {
-        let aud = document.createElement('audio');
-        aud.autoplay = true;
-        aud.srcObject = e.streams[0];
-        document.getElementById('audioPlayers').appendChild(aud);
-    };
-    if (initiator) {
-        peer.createOffer().then(o => {
-            peer.setLocalDescription(o);
-            socket.emit('webrtc-offer', { target: targetId, sdp: o });
-        });
-    }
-    return peer;
-}
-
 
 // ════════════════════════════════════════════════
 //  Helpers
@@ -1117,93 +1054,7 @@ function showToast(msg, dur=3000){
     clearTimeout(t._t);
     t._t=setTimeout(()=>{ t.style.display='none'; }, dur);
 }
-// 1. عند انتهاء اللعبة بفوز فريق (المافيا أو المواطنين)
-socket.on('gameOver', (msg) => {
-    alert("🎮 " + msg);
-    SS.clear(); // التعديل هنا
-    window.location.href = window.location.origin; 
-});
 
-// 2. في حالة إن "البوس" قفل الغرفة أو السيرفر فصل
-socket.on('roomEnded', () => {
-    alert("⚠️ انتهت الجلسة أو تم إغلاق الغرفة من قبل المضيف.");
-    SS.clear(); // التعديل هنا
-    window.location.href = window.location.origin;
-});
-
-// 3. في حالة حدوث خطأ عام (زي كود غلط أو غرفة مش موجودة)
-socket.on('error', (msg) => {
-    alert("❌ خطأ: " + msg);
-    if(msg.includes("انتهت") || msg.includes("غير موجودة")) {
-        SS.clear(); // التعديل هنا
-        window.location.href = window.location.origin;
-    }
-});
-
-async function shareRoom() {
-    const url = window.location.origin + '?code=' + myCode;
-    const text = `انضم لجيم المافيا! كود الغرفة: ${myCode}\n${url}`;
-    
-    if (navigator.share) {
-        // Web Share API - بيفتح صفحة المشاركة الأصلية (واتس، إنستا، إلخ)
-        try {
-            await navigator.share({ title: 'Mafioso Trial 🕵️', text: text, url: url });
-        } catch(e) {}
-    } else {
-        // fallback: copy to clipboard
-        navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
-    }
-}
-
-// ════════════════════════════════════════════════
-//  Timer System
-// ════════════════════════════════════════════════
-let timerInterval = null;
-let timeLeft = 0;
-let totalTime = 0;
-
-function startTimer(seconds, label, onComplete) {
-    clearInterval(timerInterval);
-    timeLeft = seconds;
-    totalTime = seconds;
-    
-    const container = document.getElementById('timerContainer');
-    const valueEl = document.getElementById('timerValue');
-    const labelEl = document.getElementById('timerLabel');
-    const fillEl = document.getElementById('timerFill');
-    
-    container.classList.add('active');
-    labelEl.textContent = label;
-    valueEl.textContent = seconds;
-    valueEl.classList.remove('timer-urgent');
-    fillEl.style.width = '100%';
-    
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        valueEl.textContent = timeLeft;
-        
-        // Progress bar
-        const percentage = (timeLeft / totalTime) * 100;
-        fillEl.style.width = percentage + '%';
-        
-        // Urgent color
-        if(timeLeft <= 5) {
-            valueEl.classList.add('timer-urgent');
-            fillEl.style.background = '#ff4d4d';
-        }
-        
-        if(timeLeft <= 0) {
-            clearInterval(timerInterval);
-            container.classList.remove('active');
-            if(onComplete) onComplete();
-        }
-    }, 1000);
-}
-
-function stopTimer() {
-    clearInterval(timerInterval);
-    document.getElementById('timerContainer').classList.remove('active');
-}
 function selectGame(type) {
     if (type === 'classic') {
         window.location.href = '/mafia-classic.html';
@@ -1222,23 +1073,19 @@ function backToGameSelect() {
     document.getElementById('game-select-view').style.display = 'block';
     document.getElementById('mafioso-join-view').style.display = 'none';
 }
+
+async function shareRoom() {
+    const url = window.location.origin + '?code=' + myCode;
+    const text = 'انضم لجيم المافيا! كود الغرفة: '+myCode+'\n'+url;
+    
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: 'Mafioso Trial 🕵️', text: text, url: url });
+        } catch(e) {}
+    } else {
+        navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
+    }
+}
 </script>
-<div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">    
-    <span style="color:gold; font-weight:bold; margin-left:15px; vertical-align: middle;">🎙️ إدارة الحوار:</span>
-    
-    <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
-        تشغيل المايك
-    </button>
-    
-    <button id="muteBtn" onclick="toggleMute()" style="display:none; background:#ffc107; color:black; border:none; border-radius:5px; cursor:pointer; width:auto; padding:10px 25px; font-size:14px; font-weight:bold; transition: 0.3s;">
-        كتم 🔇
-    </button>
-
-    <div id="audioPlayers" style="display:none;"></div>
-
-    <div style="position: absolute; bottom: 5px; right: 15px; font-size: 11px; color: rgba(212, 175, 55, 0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; pointer-events: none;">
-        Developed by <span style="font-weight: bold; color: gold; text-shadow: 1px 1px 2px black;">Mahmoud Geraba</span>
-    </div>
-</div>
 </body>
 </html>
