@@ -137,12 +137,39 @@ body {
 <!-- ══════════════════ HOME ══════════════════ -->
 <div id="screen-home" class="screen">
     <h1>🕵️‍♂️ MAFIOSO TRIAL</h1>
-    <div class="card">
-        <button class="btn-green" onclick="createRoom()">إنشاء غرفة — أنا البوس 👑</button>
-        <hr class="sep">
-        <input type="text" id="playerName" placeholder="اكتب اسمك الحقيقي">
-        <input type="text" id="roomCodeInput" placeholder="كود الغرفة" style="letter-spacing:6px;text-transform:uppercase;text-align:center;font-size:20px" oninput="this.value=this.value.toUpperCase()">
-        <button class="btn-gray" onclick="joinRoom()">انضمام كلاعب 👤</button>
+
+    <!-- اختيار اللعبة -->
+    <div id="game-select-view">
+        <p style="color:#888;margin-bottom:15px;font-size:.95em">اختار اللعبة اللي تحب تلعبها</p>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('mafioso')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🕵️‍♂️</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">مافيوسو تريال</h3>
+            <p style="color:#888;font-size:.85em">قصة جريمة بالذكاء الاصطناعي — المافيا والمواطنين والأدلة</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('classic')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🌙</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">المافيا الكلاسيك</h3>
+            <p style="color:#888;font-size:.85em">مافيا + دكتور + مواطنين — الليل والنهار بدون قصة</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('impostor')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🕵️</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">الإمبوستر</h3>
+            <p style="color:#888;font-size:.85em">اعرف الكلمة السرية... أو كن الجاسوس!</p>
+        </div>
+    </div>
+
+    <!-- واجهة المافيوسو تريال -->
+    <div id="mafioso-join-view" style="display:none">
+        <button class="btn-gray btn-sm" onclick="backToGameSelect()" style="margin-bottom:10px">← رجوع</button>
+        <div class="card">
+            <div style="font-size:1.5em;margin-bottom:4px">🕵️‍♂️</div>
+            <h3 style="color:#d4af37;margin-bottom:10px">مافيوسو تريال</h3>
+            <button class="btn-green" onclick="createRoom()">إنشاء غرفة — أنا البوس 👑</button>
+            <hr class="sep">
+            <input type="text" id="playerName" placeholder="اكتب اسمك الحقيقي">
+            <input type="text" id="roomCodeInput" placeholder="كود الغرفة" style="letter-spacing:6px;text-transform:uppercase;text-align:center;font-size:20px" oninput="this.value=this.value.toUpperCase()">
+            <button class="btn-gray" onclick="joinRoom()">انضمام كلاعب 👤</button>
+        </div>
     </div>
 </div>
 
@@ -899,7 +926,24 @@ async function shareRoom() {
         navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
     }
 }
+function selectGame(type) {
+    if (type === 'classic') {
+        window.location.href = '/mafia-classic.html';
+        return;
+    }
+    if (type === 'impostor') {
+        window.location.href = '/impostor.html';
+        return;
+    }
+    // mafioso
+    document.getElementById('game-select-view').style.display = 'none';
+    document.getElementById('mafioso-join-view').style.display = 'block';
+}
 
+function backToGameSelect() {
+    document.getElementById('game-select-view').style.display = 'block';
+    document.getElementById('mafioso-join-view').style.display = 'none';
+}
 </script>
 <div id="voiceChatBar" style="position:fixed; bottom:0; left:0; width:100%; background:rgba(10, 10, 10, 0.98); padding:10px 10px 35px 10px; border-top:2px solid #d4af37; z-index:99999; text-align:center;">    
     <span style="color:gold; font-weight:bold; margin-left:15px; vertical-align: middle;">🎙️ إدارة الحوار:</span>
