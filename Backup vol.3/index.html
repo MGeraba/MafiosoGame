@@ -80,64 +80,7 @@
 body {
     padding-bottom: 100px !important; /* مساحة كافية تحت عشان الشريط ميغطيش حاجة */
 }
-/* ══ Ghost Chat ══ */
-.ghost-chat {
-    position: fixed;
-    bottom: 100px;
-    right: 10px;
-    width: 280px;
-    max-height: 300px;
-    background: #0a0a0a;
-    border: 1px solid #555;
-    border-radius: 12px;
-    display: none;
-    flex-direction: column;
-    z-index: 100;
-}
-.ghost-chat.active {
-    display: flex;
-}
-.ghost-chat-header {
-    background: #1a1a1a;
-    padding: 10px;
-    border-radius: 12px 12px 0 0;
-    color: #888;
-    font-size: 0.85em;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.ghost-chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-    max-height: 200px;
-}
-.ghost-chat-input {
-    display: flex;
-    padding: 10px;
-    border-top: 1px solid #333;
-}
-.ghost-chat-input input {
-    flex: 1;
-    margin: 0;
-    margin-left: 8px;
-}
-.ghost-msg {
-    margin: 4px 0;
-    padding: 6px 10px;
-    background: #1a1a1a;
-    border-radius: 8px;
-    font-size: 0.9em;
-}
-.ghost-msg-name {
-    color: #d4af37;
-    font-size: 0.8em;
-    margin-bottom: 2px;
-}
-.ghost-msg-text {
-    color: #aaa;
-}
+
 /* ── إخفاء وإظهار الدور (العين) ── */
 .role-hidden {
     color: transparent !important;
@@ -164,83 +107,10 @@ body {
     border-radius: 10px;
     border: 1px dashed #555;
 }
-/* ══ Timer Component ══ */
-.timer-container {
-    position: fixed;
-    top: 50px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1a0a0a;
-    border: 2px solid #d4af37;
-    border-radius: 12px;
-    padding: 10px 20px;
-    z-index: 1000;
-    display: none;
-    box-shadow: 0 4px 20px rgba(212,175,55,0.3);
-}
-.timer-container.active {
-    display: block;
-    animation: pulseTimer 1s infinite;
-}
-@keyframes pulseTimer {
-    0%, 100% { box-shadow: 0 4px 20px rgba(212,175,55,0.3); }
-    50% { box-shadow: 0 4px 30px rgba(212,175,55,0.6); }
-}
-.timer-bar {
-    width: 200px;
-    height: 6px;
-    background: #333;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 8px;
-}
-.timer-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #d4af37, #ff6b35);
-    border-radius: 3px;
-    transition: width 1s linear;
-}
-.timer-text {
-    color: #d4af37;
-    font-weight: bold;
-    font-size: 1.2em;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.timer-label {
-    font-size: 0.7em;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-.timer-urgent {
-    color: #ff4d4d !important;
-    animation: blink 0.5s infinite;
-}
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-    
-    
-    
+
     </style>
 </head>
 <body>
-
-<!-- Ghost Chat -->
-<div id="ghostChat" class="ghost-chat">
-    <div class="ghost-chat-header">
-        <span>👻 شات الأشباح</span>
-        <button onclick="toggleGhostChat()" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2em">×</button>
-    </div>
-    <div id="ghostChatMessages" class="ghost-chat-messages"></div>
-    <div class="ghost-chat-input">
-        <input type="text" id="ghostChatInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendGhostMessage()">
-        <button onclick="sendGhostMessage()" class="btn-sm" style="width:auto">📤</button>
-    </div>
-</div>
 
 <!-- Panic Overlay -->
 <div id="panicOverlay">
@@ -260,16 +130,7 @@ body {
 
 <!-- Connection Bar -->
 <div id="conn-bar"></div>
-<!-- Timer Component -->
-<div id="timerContainer" class="timer-container">
-    <div class="timer-text">
-        <span id="timerLabel">الوقت</span>
-        <span id="timerValue">30</span>
-    </div>
-    <div class="timer-bar">
-        <div id="timerFill" class="timer-fill" style="width: 100%"></div>
-    </div>
-</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -474,9 +335,11 @@ socket.on('connect', ()=>{
     if(isBoss){
         socket.emit('bossReconnect',{roomCode:sess.code, bossToken:sess.bossToken});
     } else {
-        // ⚠️ مفيش restorePlayerScreen - نستنى السيرفر يبعت الداتا من اول وجديد
-        show('screen-wait');
-        document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
+        if(sess.gameData) restorePlayerScreen(sess.gameData, sess.hasVoted, sess.isAlive);
+        else {
+            show('screen-wait');
+            document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
+        }
         socket.emit('playerReconnect',{roomCode:sess.code, playerName:sess.name});
     }
 });
@@ -550,43 +413,7 @@ socket.on('joinedSuccess', (data)=>{
         document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
     }
 });
-// ════════════════════════════════════════════════
-//  Ghost Chat System
-// ════════════════════════════════════════════════
-function toggleGhostChat() {
-    const chat = document.getElementById('ghostChat');
-    chat.classList.toggle('active');
-}
 
-function sendGhostMessage() {
-    const input = document.getElementById('ghostChatInput');
-    const msg = input.value.trim();
-    if(!msg) return;
-    
-    socket.emit('ghostMessage', { roomCode: myCode, message: msg });
-    input.value = '';
-}
-
-socket.on('ghostMessage', (d) => {
-    // نعرض بس لو انت ميت
-    if(!isAlive) {
-        const container = document.getElementById('ghostChatMessages');
-        const div = document.createElement('div');
-        div.className = 'ghost-msg';
-        div.innerHTML = `<div class="ghost-msg-name">${d.name}</div><div class="ghost-msg-text">${d.message}</div>`;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-        
-        // نفتح الشات لو مقفول
-        document.getElementById('ghostChat').classList.add('active');
-    }
-});
-
-// في restorePlayerScreen، لو ميت نفتح الشات:
-// ضيف في نهاية restorePlayerScreen:
-if(!alive) {
-    document.getElementById('ghostChat').classList.add('active');
-}
 // ════════════════════════════════════════════════
 //  Players List (Boss Lobby)
 // ════════════════════════════════════════════════
@@ -715,54 +542,31 @@ function requestClue(){
 //  Player Game Data
 // ════════════════════════════════════════════════
 socket.on('gameData', (d)=>{
-    currentRole = d.role;
-    isAlive = d.isAlive;
-    restorePlayerScreen(d, false, d.isAlive);
+    const sess=SS.load();
+    SS.save({...sess, gameData:d, isAlive:d.isAlive});
+    restorePlayerScreen(d, sess.hasVoted||false, d.isAlive);
 });
 
-function restorePlayerScreen(d, alreadyVoted, alive){
+function restorePlayerScreen(d, alreadyVoted, isAlive){
     show('screen-player-game');
     const isMafia=d.role.includes('🔪');
-    isAlive = alive;
-    isGhost = !alive; // ← جديد: علم إنك ميت
-    
-    let roleDisplay = '';
-    let secretDisplay = '';
-    
-    // لو ميت، شوف كل حاجة (Spectator Mode)
-    if(!alive){
-        roleDisplay = `<span class="badge-civ">👻 شبح (متفرج)</span>`;
-        secretDisplay = `<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
-            <span style="color:#666;font-size:.8em">🎭 دورك الأصلي كان:</span>
-            <p style="color:#d4af37;margin-top:4px;font-weight:bold">${d.role}</p>
-        </div>`;
-    } else {
-        // لو عايش، الدور مخفي
-        roleDisplay = `<span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':'badge-civ'}">${d.role}</span>`;
-        secretDisplay = `<div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
-            <span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span>
-            <p style="color:#00ffcc;margin-top:4px">${d.charSecret}</p>
-        </div>`;
-    }
-    
     document.getElementById('playerContent').innerHTML=`
         <div class="card">
             <h2 style="color:#d4af37;margin-bottom:6px">${d.charName}</h2>
             <div class="story-box">${d.story}</div>
             
-            ${secretDisplay}
+            <div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right">
+                <span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span>
+                <p style="color:#00ffcc;margin-top:4px">${d.charSecret}</p>
+            </div>
             
-            ${alive ? `<p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>
+            <p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>
             <div class="role-container" onclick="toggleRole()">
                 <span style="font-size: 1.8em;">👁️</span>
-                ${roleDisplay}
-            </div>` : `<div class="role-container" style="border-color:#555;">
-                <span style="font-size: 1.8em;">👻</span>
-                ${roleDisplay}
+                <span id="mySecretRole" class="role-hidden ${isMafia?'badge-mafia':'badge-civ'}">${d.role}</span>
             </div>
-            <p style="color:#888;font-size:.8em;margin-top:10px;">أنت الآن متفرج، تقدر تشوف كل الأدوار!</p>`}
             
-            <!-- مكان أدلة البوس -->
+            <!-- مكان أدلة البوس لما يبعتها -->
             <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">
                 <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>
                 <div id="playerCluesList"></div>
@@ -770,14 +574,19 @@ function restorePlayerScreen(d, alreadyVoted, alive){
         </div>`;
 
     const ghostDiv=document.getElementById('ghostNotice');
+    
+    // ⬇️ التعديل المهم هنا ⬇️
+    // نخفي صندوق التصويت دائماً في بداية الجولة أو عند إعادة التحميل
     document.getElementById('vUI').style.display='none';
     
-    if(!alive){
+    if(!isAlive){
         ghostDiv.style.display='block';
-        // ← Spectator Mode: نطلب من السيرفر يبعتنا كل الأدوار
-        socket.emit('requestSpectatorData', myCode);
     } else {
         ghostDiv.style.display='none';
+        if(alreadyVoted){
+            showToast('✅ صوتك اتسجل في هذه الجولة');
+        }
+        // مسحنا السطر اللي كان بيعرض التصويت تلقائي
     }
 }
 
@@ -995,23 +804,6 @@ socket.on('executionResult', () => {
     document.getElementById('vStats').innerHTML = '<p style="color:#555">لا يوجد أصوات بعد</p>';
 });
 
-socket.on('phaseTimer', (d) => {
-    startTimer(d.seconds, d.label, () => {
-        // لما الوقت يخلص
-        if(d.phase === 'voting') {
-            showToast('⏰ انتهى وقت التصويت!');
-        }
-    });
-});
-
-socket.on('timerExpired', (d) => {
-    stopTimer();
-    if(d.autoExecute && isBoss) {
-        showToast('⏰ الوقت خلص! جاري تنفيذ الإعدام تلقائياً...');
-        setTimeout(() => confirmExecution(), 2000);
-    }
-});
-
 // ════════════════════════════════════════════════
 //  Auto-fill code from URL
 // ════════════════════════════════════════════════
@@ -1153,56 +945,6 @@ async function shareRoom() {
         // fallback: copy to clipboard
         navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
     }
-}
-
-// ════════════════════════════════════════════════
-//  Timer System
-// ════════════════════════════════════════════════
-let timerInterval = null;
-let timeLeft = 0;
-let totalTime = 0;
-
-function startTimer(seconds, label, onComplete) {
-    clearInterval(timerInterval);
-    timeLeft = seconds;
-    totalTime = seconds;
-    
-    const container = document.getElementById('timerContainer');
-    const valueEl = document.getElementById('timerValue');
-    const labelEl = document.getElementById('timerLabel');
-    const fillEl = document.getElementById('timerFill');
-    
-    container.classList.add('active');
-    labelEl.textContent = label;
-    valueEl.textContent = seconds;
-    valueEl.classList.remove('timer-urgent');
-    fillEl.style.width = '100%';
-    
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        valueEl.textContent = timeLeft;
-        
-        // Progress bar
-        const percentage = (timeLeft / totalTime) * 100;
-        fillEl.style.width = percentage + '%';
-        
-        // Urgent color
-        if(timeLeft <= 5) {
-            valueEl.classList.add('timer-urgent');
-            fillEl.style.background = '#ff4d4d';
-        }
-        
-        if(timeLeft <= 0) {
-            clearInterval(timerInterval);
-            container.classList.remove('active');
-            if(onComplete) onComplete();
-        }
-    }, 1000);
-}
-
-function stopTimer() {
-    clearInterval(timerInterval);
-    document.getElementById('timerContainer').classList.remove('active');
 }
 function selectGame(type) {
     if (type === 'classic') {

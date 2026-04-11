@@ -301,52 +301,29 @@ io.on('connection', (socket) => {
     socket.on('shareTwist', (data) => { io.to(data.roomCode).emit('twistShared', data.twist); });
 
     socket.on('startVotingPhase', (roomCode) => {
-    const room = rooms[roomCode];
-    if (!room) return;
-    
-    const VOTING_TIME = 30; // ثواني
-    
-    const alivePlayers = room.players.filter(p => p.alive);
-    const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
-    const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
-    const deadPlayers = room.players.filter(p => !p.alive);
-    const specialCase = aliveMafia.length === 1 && aliveCivilians.length === 1 && alivePlayers.length === 2;
+        const room = rooms[roomCode];
+        if (!room) return;
+        const alivePlayers = room.players.filter(p => p.alive);
+        const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
+        const aliveCivilians = alivePlayers.filter(p => !p.role.includes('🔪'));
+        const deadCivilians = room.players.filter(p => !p.alive && !p.role.includes('🔪'));
+        const deadMafia = room.players.filter(p => !p.alive && p.role.includes('🔪'));
+        const specialCase = aliveMafia.length === 1 && aliveCivilians.length === 1 && alivePlayers.length === 2;
 
-    // ابعت للكل مع الـ Timer
-    io.to(roomCode).emit('phaseTimer', {
-        seconds: VOTING_TIME,
-        label: 'التصويت',
-        phase: 'voting'
-    });
-
-    if (specialCase) {
-        const targets = alivePlayers.map(p => p.charName);
-        deadPlayers.forEach(p => { 
-            io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: true, timer: VOTING_TIME }); 
-        });
-        alivePlayers.forEach(p => { 
-            io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false, timer: VOTING_TIME }); 
-        });
-    } else {
-        alivePlayers.forEach(p => {
-            const targets = alivePlayers.filter(other => other.name !== p.name).map(other => other.charName);
-            io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: false, timer: VOTING_TIME });
-        });
-        deadPlayers.forEach(p => { 
-            io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true, timer: VOTING_TIME }); 
-        });
-    }
-    io.to(room.boss).emit('votingStarted', { timer: VOTING_TIME });
-    
-    // Auto-close بعد الوقت
-    setTimeout(() => {
-        if(room && room.votes && Object.keys(room.votes).length > 0) {
-            io.to(room.boss).emit('timerExpired', { phase: 'voting', autoExecute: true });
+        if (specialCase) {
+            const targets = alivePlayers.map(p => p.charName);
+            deadCivilians.forEach(p => { io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: true }); });
+            alivePlayers.forEach(p => { io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: false }); });
+            deadMafia.forEach(p => { io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true }); });
+        } else {
+            alivePlayers.forEach(p => {
+                const targets = alivePlayers.filter(other => other.name !== p.name).map(other => other.charName);
+                io.to(p.id).emit('nextRound', { chars: targets, canVote: true, isGhost: false });
+            });
+            room.players.filter(p => !p.alive).forEach(p => { io.to(p.id).emit('nextRound', { chars: [], canVote: false, isGhost: true }); });
         }
-    }, VOTING_TIME * 1000);
-});
-
-
+        io.to(room.boss).emit('votingStarted');
+    });
 
     socket.on('castVote', (data) => {
         const room = rooms[data.roomCode];
@@ -356,45 +333,7 @@ io.on('connection', (socket) => {
         Object.values(room.votes).forEach(v => counts[v] = (counts[v] || 0) + 1);
         io.to(room.boss).emit('voteResultUpdate', { totalVotes: Object.keys(room.votes).length, details: counts });
     });
-    socket.on('ghostMessage', ({ roomCode, message }) => {
-    const room = rooms[roomCode];
-    if (!room) return;
-    
-    const sender = room.players.find(p => p.id === socket.id);
-    if (!sender || sender.alive) return; // بس الميتين يقدروا يبعتوا
-    
-    // بعت للميتين بس
-    const deadPlayers = room.players.filter(p => !p.alive);
-    deadPlayers.forEach(p => {
-        io.to(p.id).emit('ghostMessage', {
-            name: sender.charName || sender.name,
-            message: message,
-            time: new Date().toLocaleTimeString('ar-EG')
-        });
-    });
-});
-// ══════════════════════════════════════════════
-//  Spectator Mode - Show all roles to dead players
-// ══════════════════════════════════════════════
-socket.on('requestSpectatorData', (roomCode) => {
-    const room = rooms[roomCode];
-    if (!room) return;
-    
-    const player = room.players.find(p => p.id === socket.id);
-    if (!player || player.alive) return; // بس الميتين
-    
-    // بعت كل الأدوار والأسرار
-    socket.emit('spectatorData', {
-        allPlayers: room.players.map(p => ({
-            name: p.name,
-            charName: p.charName,
-            role: p.role,
-            secret: p.secret,
-            alive: p.alive
-        })),
-        clues: room.clues || []
-    });
-});
+
     socket.on('executePlayer', (roomCode) => {
         const room = rooms[roomCode];
         if (!room) return;
