@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>الإمبوستر 🕵️</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh;padding-bottom:80px}
+        h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
+        .card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
+        button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s}
+        button:active{transform:scale(.95)}
+        input,select{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radius:8px;width:90%;margin:8px 0;font-size:16px}
+        select option{background:#222;color:#fff}
+        .screen{display:none}
+        .player-tag{display:inline-block;background:#222;padding:8px 15px;border-radius:20px;margin:5px;font-size:14px;color:#00ffcc;border:1px solid #00ffcc}
+        .loader{border:4px solid #333;border-top:4px solid #d4af37;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        #conn-bar{position:fixed;top:0;left:0;right:0;padding:7px;font-size:13px;text-align:center;z-index:9999;display:none}
+        #conn-bar.offline{background:#c0392b;display:block}
+        #conn-bar.online{background:#27ae60;display:block;animation:fadeBar 2s 1.5s forwards}
+        @keyframes fadeBar{to{opacity:0;pointer-events:none}}
+        #resultOverlay{display:none;position:fixed;inset:0;z-index:8000;align-items:center;justify-content:center;flex-direction:column;padding:20px;background:rgba(0,0,0,.92)}
+        #resultOverlay.active{display:flex}
+        .result-box{background:#151515;border:2px solid #d4af37;border-radius:16px;padding:28px;max-width:440px;width:100%}
+        .result-icon{font-size:4em;margin-bottom:10px}
+        .result-msg{font-size:1.05em;line-height:1.8;margin-bottom:20px;color:#eee;text-align:right}
+        #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;border:1px solid #d4af37;color:#fff;padding:12px 22px;border-radius:10px;z-index:9999;max-width:90%;font-size:14px;display:none;text-align:center}
+        .sep{border:none;border-top:1px solid #2a2a2a;margin:12px 0}
+        .label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right;display:block}
+        .btn-danger{background:#dc3545!important;color:#fff!important}
+        .btn-green{background:#28a745!important;color:#fff!important}
+        .btn-blue{background:#17a2b8!important;color:#fff!important}
+        .btn-orange{background:#e67e22!important;color:#fff!important}
+        .btn-gray{background:#444!important;color:#fff!important}
+        .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
+        .spy-badge{color:#ff6b35;font-size:1.4em;font-weight:bold}
+        .normal-badge{color:#00ffcc;font-size:1.4em;font-weight:bold}
+        #qrcode{margin:10px auto;display:flex;justify-content:center}
+        #qrcode img,#qrcode canvas{border-radius:8px;border:3px solid #d4af37;background:#fff;padding:6px}
+        .role-container{display:inline-flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;background:#1a1a1a;padding:12px 20px;border-radius:10px;border:1px dashed #555;cursor:pointer}
+        .role-hidden{color:transparent!important;background-color:#333!important;text-shadow:0 0 12px rgba(255,255,255,0.7);cursor:pointer;user-select:none}
+        .role-visible{cursor:pointer;user-select:none}
+        .category-badge{background:#1a2a3a;border:1px solid #1a6a9a;border-radius:8px;padding:8px 16px;color:#7fbfff;font-size:1em;margin:8px 0;display:inline-block}
+        .vote-btn{background:#222;border:2px solid #555;color:#fff;border-radius:8px;padding:10px 18px;cursor:pointer;font-size:15px;width:auto;transition:.2s;margin:4px}
+        .vote-btn:hover{border-color:#d4af37;background:#2a2a2a}
+        .vote-btn.selected{border-color:#ff4d4d;background:#2a0000;color:#ff6b6b}
+        .vote-stat{text-align:right;padding:5px 0;border-bottom:1px solid #222}
+        .timer-bar{height:8px;background:#333;border-radius:4px;overflow:hidden;margin:8px 0}
+        .timer-fill{height:100%;background:linear-gradient(90deg,#d4af37,#ff6b35);border-radius:4px;transition:width 1s linear}
+        .spy-reveal-box{background:#1a0505;border:2px solid #8b0000;border-radius:12px;padding:15px;margin:10px 0}
+    </style>
+</head>
+<body>
+<div id="conn-bar"></div>
+<div id="toast"></div>
+
+<div id="resultOverlay">
+    <div class="result-box">
+        <div class="result-icon" id="resultIcon">🕵️</div>
+        <div class="result-msg" id="resultMsg"></div>
+        <button onclick="closeResult()" id="resultBtn">حسناً</button>
+    </div>
+</div>
+
+<!-- ══ HOME ══ -->
+<div id="screen-home" class="screen">
+    <h1>🕵️ الإمبوستر</h1>
+    <p style="color:#888;font-size:.9em;margin-bottom:15px">اعرف الكلمة السرية... أو كن الجاسوس!</p>
+    <div class="card">
+        <button class="btn-green" onclick="createRoom()">إنشاء غرفة — أنا البوس 👑</button>
+        <hr class="sep">
+        <input type="text" id="playerName" placeholder="اكتب اسمك">
+        <input type="text" id="roomCodeInput" placeholder="كود الغرفة" style="letter-spacing:6px;text-transform:uppercase;text-align:center;font-size:20px" oninput="this.value=this.value.toUpperCase()">
+        <button class="btn-gray" onclick="joinRoom()">انضمام كلاعب 👤</button>
+    </div>
+    <div style="margin-top:15px">
+        <a href="/" style="color:#888;font-size:.85em">← المافيوسو تريال</a>
+    </div>
+</div>
+
+<!-- ══ WAITING ══ -->
+<div id="screen-wait" class="screen">
+    <div class="card" style="margin-top:40px">
+        <div class="loader"></div>
+        <h2 style="color:#d4af37;margin:10px 0">تم الانضمام ✅</h2>
+        <p id="wait-name" style="color:#00ffcc;font-weight:bold;font-size:1.1em"></p>
+        <p style="color:#888;margin-top:8px">انتظر البوس يبدأ الجيم...</p>
+    </div>
+</div>
+
+<!-- ══ BOSS LOBBY ══ -->
+<div id="screen-boss-lobby" class="screen">
+    <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
+    <div class="card">
+        <div id="qrcode"></div>
+        <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
+        <p style="color:#888;font-size:.85em">اللاعبون يسكنوا الـ QR أو يكتبوا الكود</p>
+        <button class="btn-blue btn-sm" onclick="shareRoom()" style="margin-top:8px">مشاركة الغرفة 📤</button>
+    </div>
+    <div class="card">
+        <h3 style="color:#d4af37;margin-bottom:12px">إعدادات اللعبة</h3>
+        
+        <span class="label">الفئة (البوس يختار أو يتركها للذكاء الاصطناعي):</span>
+        <select id="categorySelect">
+            <option value="ai">🤖 الذكاء الاصطناعي يختار تلقائياً</option>
+            <option value="أماكن">📍 أماكن</option>
+            <option value="أكل ومشروبات">🍕 أكل ومشروبات</option>
+            <option value="مشاهير وممثلين">🎬 مشاهير وممثلين</option>
+            <option value="حيوانات">🐾 حيوانات</option>
+            <option value="مهن ووظائف">💼 مهن ووظائف</option>
+            <option value="رياضة">⚽ رياضة</option>
+            <option value="أفلام ومسلسلات">🎥 أفلام ومسلسلات</option>
+            <option value="تكنولوجيا وإلكترونيات">📱 تكنولوجيا وإلكترونيات</option>
+            <option value="شخصيات كرتونية">🎨 شخصيات كرتونية</option>
+            <option value="كلمات عشوائية">🎲 كلمات عشوائية</option>
+        </select>
+
+        <span class="label" style="margin-top:10px">عدد الجواسيس:</span>
+        <select id="spyCountSelect">
+            <option value="1">1 جاسوس</option>
+            <option value="2">2 جاسوس</option>
+        </select>
+
+        <hr class="sep">
+        <span class="label">اللاعبون المتصلون:</span>
+        <div id="pList" style="margin:8px 0">انتظار...</div>
+        <p id="pCount" style="color:#888;font-size:.85em"></p>
+        <p style="color:#555;font-size:.8em">مطلوب 3 لاعبين على الأقل</p>
+        <hr class="sep">
+        <button id="startBtn" class="btn-green" onclick="startGame()" style="display:none">ابدأ الجيم 🚀</button>
+        <button class="btn-danger" onclick="closeRoom()">إغلاق الغرفة ❌</button>
+    </div>
+</div>
+
+<!-- ══ BOSS GAME ══ -->
+<div id="screen-boss-game" class="screen">
+    <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
+
+    <div class="card">
+        <span class="label">📦 الفئة السرية:</span>
+        <div class="category-badge" id="bossCategoryDisplay">...</div>
+        <span class="label" style="margin-top:10px">🔑 الكلمة السرية (للبوس فقط):</span>
+        <div style="font-size:1.6em;font-weight:bold;color:#d4af37;margin:8px 0" id="bossWordDisplay">...</div>
+        <hr class="sep">
+        <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار:</h4>
+        <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:2"></div>
+    </div>
+
+    <div class="card">
+        <h4 style="margin-bottom:8px">📊 التصويت على الجاسوس:</h4>
+        <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
+        <hr class="sep">
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+            <button class="btn-green btn-sm" id="btnStartVote" onclick="startVoting()">فتح التصويت 🗳️</button>
+            <button class="btn-orange btn-sm" id="btnReveal" onclick="revealAndScore()" style="display:none">كشف النتيجة 🎯</button>
+            <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ PLAYER GAME ══ -->
+<div id="screen-player-game" class="screen">
+    <div id="playerContent"></div>
+    <div id="voteSection" style="display:none" class="card">
+        <h3 style="margin-bottom:12px;color:#d4af37">🗳️ من هو الجاسوس؟</h3>
+        <div id="voteBtns"></div>
+    </div>
+    <div id="guessSection" style="display:none" class="card">
+        <h3 style="color:#ff6b35;margin-bottom:8px">🕵️ أنت الجاسوس!</h3>
+        <p style="color:#aaa;margin-bottom:12px">خمّن الكلمة السرية عشان تفوز حتى لو اكتشفوك:</p>
+        <input type="text" id="guessInput" placeholder="اكتب تخمينك هنا...">
+        <button class="btn-orange" onclick="submitGuess()">أرسل التخمين 🎯</button>
+    </div>
+</div>
+
+<script>
+const socket = io({ reconnection:true, reconnectionAttempts:Infinity, reconnectionDelay:1000, timeout:20000 });
+
+let myCode='', myName='', isBoss=false, amISpy=false;
+
+const SS = {
+    save(d){ try{localStorage.setItem('imp', JSON.stringify(d))}catch(e){} },
+    load(){ try{return JSON.parse(localStorage.getItem('imp')||'{}')}catch(e){return{}} },
+    clear(){ try{localStorage.removeItem('imp')}catch(e){} }
+};
+
+// ══ Connection ══
+const connBar=document.getElementById('conn-bar');
+socket.on('disconnect',()=>{ connBar.textContent='⚠️ انقطع الاتصال...'; connBar.className='offline'; });
+socket.on('connect',()=>{
+    const s=SS.load();
+    if(!s.code) return;
+    if(s._connected){ connBar.textContent='✅ رجع الاتصال!'; connBar.className='online'; }
+    s._connected=true; SS.save(s);
+    myCode=s.code; myName=s.name; isBoss=s.isBoss;
+    if(isBoss) socket.emit('impBossReconnect',{roomCode:s.code, bossToken:s.bossToken});
+    else socket.emit('impPlayerReconnect',{roomCode:s.code, playerName:s.name});
+});
+
+socket.on('roomEnded',()=>{ SS.clear(); showToast('الغرفة أُغلقت',3000); setTimeout(()=>location.reload(),2000); });
+socket.on('error',(m)=>{ showToast('⚠️ '+m,4000); const b=document.getElementById('startBtn'); if(b){b.disabled=false;b.textContent='ابدأ الجيم 🚀';} });
+
+// ══ Create ══
+function createRoom(){ isBoss=true; socket.emit('impCreateRoom'); }
+
+socket.on('impRoomCreated',(c)=>{
+    myCode=c;
+    SS.save({code:c,name:'Boss',isBoss:true,bossToken:socket.id,_connected:false});
+    initBossLobby(c);
+    show('screen-boss-lobby');
+});
+
+function initBossLobby(c){
+    document.getElementById('bossRoomTitle').textContent='الإمبوستر — الغرفة: '+c;
+    document.getElementById('lobbyCode').textContent=c;
+    document.getElementById('bossGameTitle').textContent='البوس — الغرفة: '+c;
+    const qr=document.getElementById('qrcode'); qr.innerHTML='';
+    new QRCode(qr,{text:window.location.origin+'/impostor.html?code='+c,width:160,height:160,colorDark:'#000',colorLight:'#fff'});
+}
+
+socket.on('impBossReconnected',(d)=>{
+    initBossLobby(myCode);
+    if(d.started){ show('screen-boss-game'); if(d.roomData) renderBossGameView(d.roomData); }
+    else{ show('screen-boss-lobby'); if(d.players) updatePlayerList(d.players); }
+});
+
+// ══ Join ══
+function joinRoom(){
+    const n=document.getElementById('playerName').value.trim();
+    const c=document.getElementById('roomCodeInput').value.trim().toUpperCase();
+    if(!n||!c){showToast('اكتب اسمك والكود!');return;}
+    myCode=c; myName=n;
+    SS.save({code:c,name:n,isBoss:false,_connected:false});
+    socket.emit('impJoinRoom',{roomCode:c,playerName:n});
+}
+
+socket.on('impJoinedSuccess',(d)=>{
+    if(!d?.reconnected){ show('screen-wait'); document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋'; }
+});
+
+socket.on('updatePlayersImp',updatePlayerList);
+function updatePlayerList(players){
+    const list=document.getElementById('pList'), cnt=document.getElementById('pCount');
+    if(!players.length){ list.innerHTML='<span style="color:#555">انتظار...</span>'; cnt.textContent=''; document.getElementById('startBtn').style.display='none'; return; }
+    list.innerHTML=players.map(p=>`<span class="player-tag">👤 ${p.name}</span>`).join('');
+    cnt.textContent=`✅ ${players.length} لاعب جاهز`;
+    document.getElementById('startBtn').style.display=players.length>=3?'block':'none';
+}
+
+// ══ Start ══
+function startGame(){
+    const btn=document.getElementById('startBtn');
+    btn.textContent='الذكاء الاصطناعي بيختار... 🤖';
+    btn.disabled=true;
+    socket.emit('impStartGame',{
+        roomCode:myCode,
+        category:document.getElementById('categorySelect').value,
+        spyCount:parseInt(document.getElementById('spyCountSelect').value)
+    });
+}
+
+// ══ Boss Game ══
+socket.on('impBossData',(d)=>{
+    show('screen-boss-game');
+    renderBossGameView(d);
+});
+
+function renderBossGameView(d){
+    document.getElementById('bossCategoryDisplay').textContent=d.category;
+    document.getElementById('bossWordDisplay').textContent=d.word;
+    if(d.players) renderBossSecrets(d.players, d.spies);
+}
+
+function renderBossSecrets(players, spies=[]){
+    document.getElementById('bossSecrets').innerHTML=players.map(p=>{
+        const isSpy=spies.includes(p.name);
+        return `<p><b style="color:#d4af37">${p.name}</b> — <span class="${isSpy?'spy-badge':'normal-badge'}">${isSpy?'🕵️ جاسوس':'✅ طبيعي'}</span>${!p.alive?' <span style="color:#555">(خارج)</span>':''}</p>`;
+    }).join('');
+}
+
+socket.on('impVoteUpdate',(d)=>{
+    let s='';
+    for(let k in d.details) s+=`<div class="vote-stat">${k}: <b style="color:#d4af37">${d.details[k]}</b> أصوات</div>`;
+    s+=`<p style="color:#555;font-size:.8em;text-align:right;margin-top:5px">إجمالي: ${d.totalVotes}</p>`;
+    document.getElementById('vStats').innerHTML=s;
+});
+
+function startVoting(){
+    socket.emit('impStartVoting', myCode);
+    document.getElementById('btnStartVote').disabled=true;
+    document.getElementById('btnStartVote').textContent='التصويت جاري...';
+    showToast('تم فتح التصويت!',3000);
+}
+
+function revealAndScore(){
+    socket.emit('impRevealResult', myCode);
+    document.getElementById('btnReveal').disabled=true;
+}
+
+socket.on('impVotingStarted',()=>{ 
+    document.getElementById('btnReveal').style.display='inline-block';
+    showToast('تم فتح التصويت للاعبين!',3000); 
+});
+
+// ══ Player Game ══
+socket.on('impGameData',(d)=>{
+    amISpy=d.isSpy;
+    SS.save({...SS.load(), gameData:d});
+    renderPlayerScreen(d);
+});
+
+socket.on('impPlayerReconnected',(d)=>{
+    if(d.gameData){ amISpy=d.gameData.isSpy; renderPlayerScreen(d.gameData); }
+    else{ show('screen-wait'); document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋'; }
+});
+
+function renderPlayerScreen(d){
+    show('screen-player-game');
+    amISpy=d.isSpy;
+    const hint = d.isSpy
+        ? `<div style="background:#1a0505;border:1px solid #8b0000;border-radius:8px;padding:10px;margin:10px 0;color:#ff6b6b">🕵️ أنت الجاسوس! حاول تعرف الكلمة السرية من النقاش.</div>`
+        : `<div style="background:#0a1a1a;border:1px solid #1a6a4a;border-radius:8px;padding:10px;margin:10px 0"><span style="color:#888;font-size:.85em">📦 الفئة: </span><b style="color:#7fbfff">${d.category}</b><br><span style="color:#888;font-size:.85em">🔑 الكلمة: </span><b style="color:#00ffcc;font-size:1.2em">${d.word}</b></div>`;
+    
+    document.getElementById('playerContent').innerHTML=`
+        <div class="card">
+            <h2 style="color:#d4af37;margin-bottom:8px">${d.name}</h2>
+            ${hint}
+            <p style="color:#888;font-size:.8em;margin-top:8px">اضغط على العين لكشف/إخفاء دورك</p>
+            <div class="role-container" onclick="toggleRole()">
+                <span style="font-size:1.8em">👁️</span>
+                <span id="mySecretRole" class="role-hidden ${d.isSpy?'spy-badge':'normal-badge'}">${d.isSpy?'🕵️ جاسوس':'✅ طبيعي'}</span>
+            </div>
+            <p style="color:#555;font-size:.8em;margin-top:12px">انتظر البوس يفتح التصويت...</p>
+        </div>`;
+}
+
+function toggleRole(){
+    const r=document.getElementById('mySecretRole');
+    r.classList.toggle('role-hidden');
+    r.classList.toggle('role-visible');
+}
+
+socket.on('impStartDayVoting',(d)=>{
+    if(!d.canVote) return;
+    const sec=document.getElementById('voteSection');
+    const btns=document.getElementById('voteBtns');
+    sec.style.display='block';
+    btns.innerHTML='';
+    d.targets.forEach(t=>{
+        const btn=document.createElement('button');
+        btn.className='vote-btn';
+        btn.textContent=t;
+        btn.onclick=()=>{
+            socket.emit('impCastVote',{roomCode:myCode,target:t});
+            btns.querySelectorAll('.vote-btn').forEach(b=>b.disabled=true);
+            btn.classList.add('selected');
+            btn.textContent+=' ✓';
+            showToast('✅ تم إرسال صوتك!',3000);
+        };
+        btns.appendChild(btn);
+    });
+    
+    // لو جاسوس، نوريله خانة التخمين برضو
+    if(amISpy) document.getElementById('guessSection').style.display='block';
+});
+
+function submitGuess(){
+    const g=document.getElementById('guessInput').value.trim();
+    if(!g){showToast('اكتب تخمينك أولاً!');return;}
+    socket.emit('impSpyGuess',{roomCode:myCode,guess:g});
+    document.getElementById('guessSection').style.display='none';
+    showToast('✅ تم إرسال تخمينك!',3000);
+}
+
+// ══ Result ══
+socket.on('impResult',(d)=>{
+    SS.clear();
+    let html=`<b style="font-size:1.2em;display:block;margin-bottom:12px">${d.title}</b>`;
+    html+=`<div class="spy-reveal-box"><p style="color:#ff6b6b;margin-bottom:8px">🕵️ الجواسيس كانوا:</p>${d.spies.map(s=>`<span class="player-tag" style="color:#ff4d4d;border-color:#8b0000">${s}</span>`).join('')}</div>`;
+    html+=`<div style="margin:12px 0;background:#0a1a0a;border:1px solid #1a5a1a;border-radius:8px;padding:10px"><span style="color:#888">🔑 الكلمة السرية كانت: </span><b style="color:#00ffcc;font-size:1.2em">${d.word}</b></div>`;
+    if(d.spyGuess) html+=`<p style="color:#aaa;margin:8px 0">🎯 تخمين الجاسوس: <b style="color:${d.guessCorrect?'#00ffcc':'#ff4d4d'}">${d.spyGuess}</b> ${d.guessCorrect?'✅ صح!':'❌ غلط'}</p>`;
+    html+=`<p style="color:#d4af37;margin-top:12px;font-size:1.1em">${d.winnerText}</p>`;
+    html+=`<br><button onclick="location.reload()" style="width:auto;padding:10px 24px">العب تاني 🔄</button>`;
+    
+    document.getElementById('resultIcon').textContent=d.icon;
+    document.getElementById('resultMsg').innerHTML=html;
+    document.getElementById('resultBtn').style.display='none';
+    document.getElementById('resultOverlay').classList.add('active');
+});
+
+// ══ Helpers ══
+function closeResult(){ document.getElementById('resultOverlay').classList.remove('active'); }
+function closeRoom(){ if(confirm('إغلاق الغرفة؟')){ socket.emit('impCloseRoom',myCode); SS.clear(); location.reload(); } }
+async function shareRoom(){
+    const url=window.location.origin+'/impostor.html?code='+myCode;
+    const text=`انضم للإمبوستر! كود: ${myCode}\n${url}`;
+    if(navigator.share){ try{await navigator.share({title:'الإمبوستر 🕵️',text,url});}catch(e){} }
+    else navigator.clipboard.writeText(text).then(()=>showToast('✅ تم نسخ الرابط!',3000));
+}
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.style.display='none'); const el=document.getElementById(id); if(el) el.style.display='block'; }
+function showToast(msg,dur=3000){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',dur); }
+
+window.addEventListener('load',()=>{
+    const code=new URLSearchParams(location.search).get('code');
+    if(code) document.getElementById('roomCodeInput').value=code.toUpperCase();
+    const sess=SS.load();
+    if(!sess.code||!sess._connected) show('screen-home');
+});
+</script>
+</body>
+</html>

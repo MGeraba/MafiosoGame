@@ -1,40 +1,51 @@
 // ════════════════════════════════════════════════════════════════
-//  MAFIA CLASSIC — Server Module
-//  الملف ده يتضاف في server.js جوه io.on('connection', ...)
+//  MAFIA CLASSIC — Server Module (v2 - fixed)
 // ════════════════════════════════════════════════════════════════
 
-// rooms للمافيا الكلاسيك منفصلة عن rooms الأصلية
-// اضيف السطر ده قبل io.on('connection') في server.js:
-// let mcRooms = {};
+module.exports = function registerMafiaClassic(io, socket, mcRooms) {
 
-module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIResponse) {
-
-    // ── حساب عدد المافيا ─────────────────────────────────────────
-    function getMafiaCount(playerCount) {
-        if (playerCount >= 10) return 4;
-        if (playerCount >= 8)  return 3;
-        if (playerCount >= 5)  return 2;
+    function getMafiaCount(n) {
+        if (n >= 10) return 4;
+        if (n >= 8)  return 3;
+        if (n >= 5)  return 2;
         return 1;
     }
 
-    // ── فحص الفوز ────────────────────────────────────────────────
     function checkWin(room) {
-        const alive = room.players.filter(p => p.alive);
+        const alive = room.players.filter(p => p.alive && p.role !== 'spectator');
         const aliveMafia = alive.filter(p => p.role === 'mafia');
-        const aliveCiv = alive.filter(p => p.role !== 'mafia');
+        const aliveCiv   = alive.filter(p => p.role !== 'mafia');
         if (aliveMafia.length === 0) return { over: true, winner: 'civilians' };
         if (aliveMafia.length >= aliveCiv.length) return { over: true, winner: 'mafia' };
         return { over: false };
     }
 
+    function buildPlayerData(p, room) {
+        const mafiaTeam = p.role === 'mafia'
+            ? room.players.filter(pl => pl.role === 'mafia').map(pl => pl.name)
+            : [];
+        return { name: p.name, role: p.role, mafiaTeam, isAlive: p.alive };
+    }
+
+    function broadcastLobbyList() {
+        const list = Object.entries(mcRooms)
+            .filter(([, r]) => !r.isPrivate)
+            .map(([code, r]) => ({
+                code,
+                players: r.players.filter(p => p.role !== 'spectator').length,
+                started: r.started
+            }));
+        io.emit('mcLobbyList', list);
+    }
+
     // ── إنشاء غرفة ───────────────────────────────────────────────
-    socket.on('mcCreateRoom', () => {
+    socket.on('mcCreateRoom', (opts = {}) => {
         const code = Math.random().toString(36).substring(2, 6).toUpperCase();
         mcRooms[code] = {
             boss: socket.id,
             bossToken: socket.id,
             players: [],
-            phase: 'lobby', // lobby | night_mafia | night_doctor | day
+            phase: 'lobby',
             round: 1,
             mafiaVotes: {},
             dayVotes: {},
@@ -42,13 +53,17 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
             gameOver: false,
             nightTarget: null,
             doctorSave: null,
-            firstRound: true
+            doctorVoted: false,
+            firstRound: true,
+            isPrivate: !!opts.isPrivate,
+            pendingJoins: {}
         };
         socket.join('mc_' + code);
         socket.emit('mcRoomCreated', code);
+        broadcastLobbyList();
     });
 
-    // ── Boss Reconnect ─────────────────────────────────────────────
+    // ── Boss Reconnect ────────────────────────────────────────────
     socket.on('mcBossReconnect', ({ roomCode, bossToken }) => {
         const room = mcRooms[roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
@@ -59,10 +74,7 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
         socket.emit('mcBossReconnected', {
             started: room.started,
             players: room.players,
-            roomData: room.started ? {
-                players: room.players,
-                phase: room.phase
-            } : null
+            roomData: room.started ? { players: room.players, phase: room.phase } : null
         });
     });
 
@@ -70,18 +82,51 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
     socket.on('mcJoinRoom', (data) => {
         const room = mcRooms[data.roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
-        if (room.started) { socket.emit('error', 'اللعبة بدأت!'); return; }
+
         const existing = room.players.find(p => p.name === data.playerName);
+
+        if (room.started && !existing) {
+            room.pendingJoins[socket.id] = { id: socket.id, name: data.playerName };
+            io.to(room.boss).emit('mcJoinRequest', { id: socket.id, name: data.playerName });
+            socket.emit('mcWaitingApproval');
+            return;
+        }
+
         if (existing) {
             existing.id = socket.id;
             socket.join('mc_' + data.roomCode);
             socket.emit('mcJoinedSuccess', { reconnected: true });
+            if (room.started) socket.emit('mcGameData', buildPlayerData(existing, room));
         } else {
             room.players.push({ id: socket.id, name: data.playerName, role: 'civilian', alive: true });
             socket.join('mc_' + data.roomCode);
             socket.emit('mcJoinedSuccess', { reconnected: false });
         }
         io.to(room.boss).emit('updatePlayersMC', room.players);
+        broadcastLobbyList();
+    });
+
+    // ── موافقة البوس على الانضمام أثناء اللعب ──────────────────
+    socket.on('mcApproveJoin', ({ roomCode, playerId, approve }) => {
+        const room = mcRooms[roomCode];
+        if (!room || room.boss !== socket.id) return;
+        const pending = room.pendingJoins[playerId];
+        if (!pending) return;
+        delete room.pendingJoins[playerId];
+
+        if (approve) {
+            room.players.push({ id: playerId, name: pending.name, role: 'spectator', alive: false });
+            const s = io.sockets.sockets.get(playerId);
+            if (s) {
+                s.join('mc_' + roomCode);
+                s.emit('mcJoinedSuccess', { reconnected: false, spectator: true });
+                s.emit('mcGameData', { name: pending.name, role: 'spectator', mafiaTeam: [], isAlive: false });
+            }
+            io.to(room.boss).emit('updatePlayersMC', room.players);
+            io.to('mc_' + roomCode).emit('mcChatMessage', { from: '🔔 النظام', message: `${pending.name} انضم كمشاهد`, time: '' });
+        } else {
+            io.to(playerId).emit('error', 'البوس رفض طلب انضمامك');
+        }
     });
 
     // ── Player Reconnect ──────────────────────────────────────────
@@ -93,9 +138,8 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
             p.id = socket.id;
             socket.join('mc_' + data.roomCode);
             if (room.started) {
-                const gameData = buildPlayerData(p, room);
-                socket.emit('mcGameData', gameData);
-                socket.emit('mcPlayerReconnected', { gameData });
+                socket.emit('mcGameData', buildPlayerData(p, room));
+                socket.emit('mcPlayerReconnected', { gameData: buildPlayerData(p, room) });
             } else {
                 socket.emit('mcJoinedSuccess', { reconnected: true });
                 io.to(room.boss).emit('updatePlayersMC', room.players);
@@ -103,49 +147,58 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
         }
     });
 
-    function buildPlayerData(p, room) {
-        const mafiaTeam = p.role === 'mafia'
-            ? room.players.filter(pl => pl.role === 'mafia').map(pl => pl.name)
-            : [];
-        return {
-            name: p.name,
-            role: p.role,
-            mafiaTeam,
-            isAlive: p.alive
-        };
-    }
-
-    // ── بدء اللعبة ────────────────────────────────────────────────
-    socket.on('mcStartGame', async ({ roomCode }) => {
+    // ── خروج لاعب ────────────────────────────────────────────────
+    socket.on('mcLeaveRoom', ({ roomCode }) => {
         const room = mcRooms[roomCode];
-        if (!room || room.players.length < 4) { socket.emit('error', 'مطلوب 4 لاعبين على الأقل'); return; }
+        if (!room) return;
+        room.players = room.players.filter(p => p.id !== socket.id);
+        socket.leave('mc_' + roomCode);
+        socket.emit('mcLeftRoom');
+        io.to(room.boss).emit('updatePlayersMC', room.players);
+        broadcastLobbyList();
+    });
 
-        room.started = true;
-        room.phase = 'night_mafia';
+    // ── بدء / إعادة اللعبة ───────────────────────────────────────
+    socket.on('mcStartGame', ({ roomCode }) => {
+        const room = mcRooms[roomCode];
+        if (!room) return;
+        const realPlayers = room.players.filter(p => p.role !== 'spectator');
+        if (realPlayers.length < 4) { socket.emit('error', 'مطلوب 4 لاعبين على الأقل'); return; }
+
+        room.started   = true;
+        room.gameOver  = false;
+        room.phase     = 'night_mafia';
         room.firstRound = true;
+        room.round     = 1;
+        room.mafiaVotes = {};
+        room.dayVotes   = {};
+        room.nightTarget = null;
+        room.doctorSave  = null;
+        room.doctorVoted = false;
 
-        // توزيع الأدوار عشوائياً
-        const count = room.players.length;
-        const mafiaCount = getMafiaCount(count);
-        const shuffled = [...room.players].sort(() => Math.random() - 0.5);
-
-        room.players.forEach(p => p.role = 'civilian');
+        const mafiaCount = getMafiaCount(realPlayers.length);
+        const shuffled   = [...realPlayers].sort(() => Math.random() - 0.5);
+        realPlayers.forEach(p => { p.role = 'civilian'; p.alive = true; });
         shuffled.slice(0, mafiaCount).forEach(p => p.role = 'mafia');
-        // دكتور واحد دايماً
-        const remaining = shuffled.slice(mafiaCount);
-        if (remaining.length > 0) remaining[0].role = 'doctor';
+        const nonMafia = shuffled.slice(mafiaCount);
+        if (nonMafia.length > 0) nonMafia[0].role = 'doctor';
 
-        // إرسال البيانات للبوس
         io.to(room.boss).emit('mcBossData', { players: room.players });
+        room.players.forEach(p => io.to(p.id).emit('mcGameData', buildPlayerData(p, room)));
 
-        // إرسال البيانات للاعبين
-        room.players.forEach(p => {
-            const data = buildPlayerData(p, room);
-            io.to(p.id).emit('mcGameData', data);
-        });
-
-        // بدء مرحلة الليل
         startNightPhase(roomCode);
+        broadcastLobbyList();
+    });
+
+    socket.on('mcRestartGame', ({ roomCode }) => {
+        const room = mcRooms[roomCode];
+        if (!room || room.boss !== socket.id) return;
+        room.started  = false;
+        room.gameOver = false;
+        room.players.forEach(p => { p.role = p.role === 'spectator' ? 'spectator' : 'civilian'; p.alive = true; });
+        io.to('mc_' + roomCode).emit('mcBackToLobby', { players: room.players });
+        io.to(room.boss).emit('updatePlayersMC', room.players);
+        broadcastLobbyList();
     });
 
     // ── مرحلة الليل ──────────────────────────────────────────────
@@ -154,65 +207,61 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
         if (!room) return;
 
         room.phase = 'night_mafia';
-        room.mafiaVotes = {};
+        room.mafiaVotes  = {};
         room.nightTarget = null;
-        room.doctorSave = null;
+        room.doctorSave  = null;
+        room.doctorVoted = false;
 
-        const alivePlayers = room.players.filter(p => p.alive);
-        const aliveMafia = alivePlayers.filter(p => p.role === 'mafia');
-        const aliveNonMafia = alivePlayers.filter(p => p.role !== 'mafia');
+        const alive = room.players.filter(p => p.alive && p.role !== 'spectator');
+        const aliveMafia  = alive.filter(p => p.role === 'mafia');
+        const aliveOthers = alive.filter(p => p.role !== 'mafia');
 
-        // المافيا تختار ضحية من المواطنين الأحياء
         aliveMafia.forEach(p => {
             io.to(p.id).emit('mcNightAction', {
-                type: 'mafia_kill',
-                canAct: true,
-                targets: aliveNonMafia.map(pl => pl.name)
+                type: 'mafia_kill', canAct: true,
+                targets: aliveOthers.map(pl => pl.name)
             });
         });
 
-        // المواطنون لا يفعلون شيئاً
-        aliveNonMafia.filter(p => p.role !== 'doctor').forEach(p => {
+        aliveOthers.forEach(p => io.to(p.id).emit('mcNightAction', { canAct: false }));
+        room.players.filter(p => !p.alive || p.role === 'spectator').forEach(p => {
             io.to(p.id).emit('mcNightAction', { canAct: false });
         });
-
-        // الدكتور لا يفعل شيئاً في هذه المرحلة بعد
-        const doctor = aliveNonMafia.find(p => p.role === 'doctor');
-        if (doctor) io.to(doctor.id).emit('mcNightAction', { canAct: false });
     }
 
-    // ── تصويت المافيا ────────────────────────────────────────────
+    // ── تصويت الليل ──────────────────────────────────────────────
     socket.on('mcNightVote', ({ roomCode, target, type }) => {
         const room = mcRooms[roomCode];
-        if (!room || room.phase !== 'night_mafia') return;
-        if (type !== 'mafia_kill') return;
-
+        if (!room) return;
         const voter = room.players.find(p => p.id === socket.id);
-        if (!voter || voter.role !== 'mafia' || !voter.alive) return;
+        if (!voter || !voter.alive) return;
 
-        room.mafiaVotes[socket.id] = target;
+        // مافيا
+        if (type === 'mafia_kill' && voter.role === 'mafia' && room.phase === 'night_mafia') {
+            room.mafiaVotes[socket.id] = target;
+            const counts = {};
+            Object.values(room.mafiaVotes).forEach(v => counts[v] = (counts[v] || 0) + 1);
+            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+            const aliveMafia = room.players.filter(p => p.alive && p.role === 'mafia');
+            const allVoted   = Object.keys(room.mafiaVotes).length >= aliveMafia.length;
+            io.to(room.boss).emit('mcMafiaChose', {
+                target: sorted[0]?.[0], votes: sorted[0]?.[1] || 0,
+                mafiaCount: aliveMafia.length, allVoted
+            });
+            if (allVoted) {
+                room.nightTarget = sorted[0]?.[0];
+                room.phase = 'night_doctor';
+                startDoctorPhase(roomCode);
+            }
+            return;
+        }
 
-        // حساب الأصوات
-        const counts = {};
-        Object.values(room.mafiaVotes).forEach(v => counts[v] = (counts[v] || 0) + 1);
-        const sortedVotes = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-        const topTarget = sortedVotes[0]?.[0];
-        const topCount = sortedVotes[0]?.[1] || 0;
-
-        const aliveMafia = room.players.filter(p => p.alive && p.role === 'mafia');
-        const allVoted = Object.keys(room.mafiaVotes).length >= aliveMafia.length;
-
-        io.to(room.boss).emit('mcMafiaChose', {
-            target: topTarget,
-            votes: topCount,
-            mafiaCount: aliveMafia.length,
-            allVoted
-        });
-
-        if (allVoted) {
-            room.nightTarget = topTarget;
-            room.phase = 'night_doctor';
-            startDoctorPhase(roomCode);
+        // دكتور
+        if (type === 'doctor_save' && voter.role === 'doctor' && room.phase === 'night_doctor') {
+            if (room.doctorVoted) return;
+            room.doctorVoted = true;
+            room.doctorSave  = target;
+            io.to(room.boss).emit('mcDoctorChose', { target });
         }
     });
 
@@ -222,100 +271,69 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
         if (!room) return;
 
         const doctor = room.players.find(p => p.role === 'doctor' && p.alive);
-        const alivePlayers = room.players.filter(p => p.alive);
+        const alive  = room.players.filter(p => p.alive && p.role !== 'spectator');
 
-        if (!doctor) return; // لو الدكتور مات
+        room.players.filter(p => p.role !== 'doctor').forEach(p => {
+            io.to(p.id).emit('mcNightAction', { canAct: false });
+        });
 
-        let doctorTargets;
-        if (room.firstRound) {
-            // الجولة الأولى: الدكتور يعرف اسم المختار فقط
-            doctorTargets = [room.nightTarget];
-        } else {
-            // الجولات التالية: الدكتور يختار من الكل (بما فيهم نفسه والمافيا)
-            doctorTargets = alivePlayers.map(p => p.name);
+        if (!doctor) {
+            room.doctorSave = null;
+            io.to(room.boss).emit('mcDoctorChose', { target: null, doctorDead: true });
+            return;
         }
 
+        const targets = room.firstRound ? [room.nightTarget] : alive.map(p => p.name);
         io.to(doctor.id).emit('mcNightAction', {
-            type: 'doctor_save',
-            canAct: true,
-            targets: doctorTargets
+            type: 'doctor_save', canAct: true,
+            targets, isFirstRound: room.firstRound
         });
     }
 
-    // ── قرار الدكتور ─────────────────────────────────────────────
-    socket.on('mcNightVote', ({ roomCode, target, type }) => {
-        const room = mcRooms[roomCode];
-        if (!room || type !== 'doctor_save') return;
-
-        const voter = room.players.find(p => p.id === socket.id);
-        if (!voter || voter.role !== 'doctor' || !voter.alive) return;
-
-        room.doctorSave = target;
-        io.to(room.boss).emit('mcDoctorChose', { target });
-    });
-
-    // ── كشف نتيجة الليل (البوس) ──────────────────────────────────
+    // ── كشف نتيجة الليل ──────────────────────────────────────────
     socket.on('mcRevealNight', (roomCode) => {
         const room = mcRooms[roomCode];
         if (!room) return;
 
         const target = room.nightTarget;
-        const saved = room.doctorSave === target;
-        let killed = false;
-        let killedPlayer = null;
+        const saved  = room.doctorSave != null && room.doctorSave === target;
+        let killed   = false;
 
         if (!saved && target) {
             const p = room.players.find(pl => pl.name === target);
-            if (p && p.alive) {
-                p.alive = false;
-                killed = true;
-                killedPlayer = p;
-            }
+            if (p && p.alive && p.role !== 'spectator') { p.alive = false; killed = true; }
         }
 
         room.firstRound = false;
-
         const win = checkWin(room);
-        io.to(room.boss).emit('mcNightResult', {
-            saved,
-            killed,
-            targetName: target,
-            players: room.players
-        });
 
-        // إعلان عام للاعبين بنتيجة الليل
-        if (killed) {
-            io.to('mc_' + roomCode).emit('mcRoundAnnounce', {
-                message: `🌅 الصباح — وُجد ${target} ميتاً! الجميع يجتمع للنقاش...`
-            });
-        } else {
-            io.to('mc_' + roomCode).emit('mcRoundAnnounce', {
-                message: `🌅 الصباح — ليلة هادئة! لا أحد مات. ابدأوا النقاش...`
-            });
-        }
+        io.to(room.boss).emit('mcNightResult', { saved, killed, targetName: target, players: room.players });
 
-        if (win.over) {
-            endGame(roomCode, win.winner);
-        }
+        const msg = killed
+            ? `🌅 الصباح — وُجد ${target} ميتاً! ابدأوا النقاش...`
+            : `🌅 الصباح — ليلة هادئة! لا أحد مات. ابدأوا النقاش...`;
+        io.to('mc_' + roomCode).emit('mcRoundAnnounce', { message: msg });
+
+        if (win.over) endGame(roomCode, win.winner);
     });
 
     // ── بدء التصويت النهاري ──────────────────────────────────────
     socket.on('mcStartVoting', (roomCode) => {
         const room = mcRooms[roomCode];
         if (!room) return;
-        room.phase = 'day';
-        room.dayVotes = {};
+        room.phase     = 'day';
+        room.dayVotes  = {};
 
-        const alivePlayers = room.players.filter(p => p.alive);
-
-        alivePlayers.forEach(p => {
-            const targets = alivePlayers.filter(o => o.name !== p.name).map(o => o.name);
-            io.to(p.id).emit('mcStartDayVoting', { canVote: true, targets });
+        const alive = room.players.filter(p => p.alive && p.role !== 'spectator');
+        alive.forEach(p => {
+            io.to(p.id).emit('mcStartDayVoting', {
+                canVote: true,
+                targets: alive.filter(o => o.name !== p.name).map(o => o.name)
+            });
         });
-        room.players.filter(p => !p.alive).forEach(p => {
+        room.players.filter(p => !p.alive || p.role === 'spectator').forEach(p => {
             io.to(p.id).emit('mcStartDayVoting', { canVote: false, targets: [] });
         });
-
         io.to(room.boss).emit('votingStarted');
     });
 
@@ -324,14 +342,11 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
         const room = mcRooms[roomCode];
         if (!room || room.phase !== 'day') return;
         const voter = room.players.find(p => p.id === socket.id);
-        if (!voter || !voter.alive) return;
+        if (!voter || !voter.alive || voter.role === 'spectator') return;
         room.dayVotes[socket.id] = target;
         const counts = {};
         Object.values(room.dayVotes).forEach(v => counts[v] = (counts[v] || 0) + 1);
-        io.to(room.boss).emit('mcVoteUpdate', {
-            totalVotes: Object.keys(room.dayVotes).length,
-            details: counts
-        });
+        io.to(room.boss).emit('mcVoteUpdate', { totalVotes: Object.keys(room.dayVotes).length, details: counts });
     });
 
     // ── تنفيذ الإعدام ─────────────────────────────────────────────
@@ -350,32 +365,40 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
         const p = room.players.find(pl => pl.name === kickedName);
         if (p) p.alive = false;
 
-        const isMafia = p?.role === 'mafia';
-        const aliveMafia = room.players.filter(pl => pl.alive && pl.role === 'mafia').length;
+        const isMafia  = p?.role === 'mafia';
+        const isDoctor = p?.role === 'doctor';
         const win = checkWin(room);
 
         io.to(room.boss).emit('mcExecutionResult', {
-            charName: kickedName,
-            isMafia,
-            remaining: aliveMafia,
-            players: room.players,
-            gameOver: win.over
+            charName: kickedName, isMafia, isDoctor,
+            remaining: room.players.filter(pl => pl.alive && pl.role === 'mafia').length,
+            players: room.players, gameOver: win.over
         });
 
-        // إعلان للاعبين
-        const roleAnnounce = isMafia ? '🔪 كان مافيا!' : p?.role === 'doctor' ? '💉 كان الدكتور!' : '👤 كان مواطناً بريئاً!';
-        io.to('mc_' + roomCode).emit('mcRoundAnnounce', {
-            message: `⚖️ ${kickedName} نُفّذ فيه الإعدام — ${roleAnnounce}`
-        });
+        const roleAnnounce = isMafia ? '🔪 كان مافيا!' : isDoctor ? '💉 كان الدكتور!' : '👤 كان مواطناً بريئاً!';
+        io.to('mc_' + roomCode).emit('mcRoundAnnounce', { message: `⚖️ ${kickedName} نُفّذ فيه الإعدام — ${roleAnnounce}` });
 
         if (win.over) {
             endGame(roomCode, win.winner);
         } else {
             room.round++;
             room.dayVotes = {};
-            // بدء ليلة جديدة بعد شوية
             setTimeout(() => startNightPhase(roomCode), 3000);
         }
+    });
+
+    // ── تشات ─────────────────────────────────────────────────────
+    socket.on('mcChat', ({ roomCode, message }) => {
+        const room = mcRooms[roomCode];
+        if (!room) return;
+        const sender  = room.players.find(p => p.id === socket.id);
+        const isBoss  = socket.id === room.boss;
+        const name    = isBoss ? '👑 البوس' : (sender?.name || 'مجهول');
+        io.to('mc_' + roomCode).emit('mcChatMessage', {
+            from: name,
+            message: String(message).substring(0, 200),
+            time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+        });
     });
 
     // ── إنهاء اللعبة ─────────────────────────────────────────────
@@ -383,29 +406,39 @@ module.exports = function registerMafiaClassic(io, socket, mcRooms, getAIRespons
         const room = mcRooms[roomCode];
         if (!room) return;
         room.gameOver = true;
-        const msg = winner === 'civilians'
-            ? '🏆 المدينة انتصرت! تم القضاء على المافيا كلها!'
-            : '💀 المافيا كسبت! استولوا على المدينة!';
-
-        const spies = room.players.filter(p => p.role === 'mafia').map(p => p.name);
+        room.started  = false;
+        const spies  = room.players.filter(p => p.role === 'mafia').map(p => p.name);
         const doctor = room.players.find(p => p.role === 'doctor')?.name;
-
+        const msg    = winner === 'civilians' ? '🏆 المدينة انتصرت!' : '💀 المافيا كسبت!';
         setTimeout(() => {
             io.to('mc_' + roomCode).emit('mcGameOver', {
-                winner,
-                message: msg + (doctor ? `\n💉 الدكتور كان: ${doctor}` : '') + `\n🔪 المافيا كانوا: ${spies.join(', ')}`,
-                icon: winner === 'civilians' ? '🏆' : '💀'
+                winner, message: msg,
+                details: `💉 الدكتور: ${doctor || 'مات'}  |  🔪 المافيا: ${spies.join(', ')}`
             });
-            if (mcRooms[roomCode]) mcRooms[roomCode].gameOver = true;
-        }, 3000);
+            broadcastLobbyList();
+        }, 2500);
     }
+
+    // ── قائمة الغرف ──────────────────────────────────────────────
+    socket.on('mcGetLobbyList', () => {
+        const list = Object.entries(mcRooms)
+            .filter(([, r]) => !r.isPrivate)
+            .map(([code, r]) => ({
+                code,
+                players: r.players.filter(p => p.role !== 'spectator').length,
+                started: r.started
+            }));
+        socket.emit('mcLobbyList', list);
+    });
 
     // ── إغلاق الغرفة ─────────────────────────────────────────────
     socket.on('mcCloseRoom', (roomCode) => {
         io.to('mc_' + roomCode).emit('roomEnded');
         delete mcRooms[roomCode];
+        // re-broadcast
+        const list = Object.entries(mcRooms)
+            .filter(([, r]) => !r.isPrivate)
+            .map(([code, r]) => ({ code, players: r.players.length, started: r.started }));
+        io.emit('mcLobbyList', list);
     });
-
-    // ── Disconnect ────────────────────────────────────────────────
-    // يتعالج في server.js الأصلي مع الـ disconnect handler
 };
