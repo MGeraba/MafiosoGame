@@ -51,7 +51,7 @@ input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radiu
 /* ── Role Reveal (improved) ── */
 .role-card{position:relative;background:#111;border-radius:12px;padding:16px;margin:10px 0;cursor:pointer;user-select:none;transition:.3s;overflow:hidden;border:2px dashed #333}
 .role-card:hover{border-color:#555}
-.role-card.hidden .role-real{filter:blur(8px);opacity:.3;transition:.3s}
+.role-card.hidden .role-real{filter:blur(12px);opacity:0;transition:.3s;pointer-events:none;user-select:none}
 .role-card.hidden::after{content:'👁️ اضغط لكشف دورك';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1em;color:#888;background:rgba(0,0,0,.4);border-radius:10px}
 .role-card.revealed .role-real{filter:none;opacity:1;transition:.3s}
 .role-real{font-size:1.8em;font-weight:bold;padding:8px 0;transition:.3s}
@@ -71,6 +71,23 @@ input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radiu
 .lobby-room-card:hover{border-color:#d4af37}
 /* ── join request badge ── */
 .join-req{background:#1a1a2e;border:1px solid #4444ff;border-radius:8px;padding:8px 12px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;font-size:.9em}
+/* ── Phase Timer ── */
+#phaseTimerBar{display:none;margin:8px 0}
+.timer-wrap{background:#1a1a1a;border-radius:8px;padding:8px 12px;border:1px solid #333}
+.timer-label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right}
+.timer-track{height:6px;background:#333;border-radius:3px;overflow:hidden}
+.timer-fill{height:100%;border-radius:3px;transition:width 1s linear}
+.timer-fill.green{background:#28a745}
+.timer-fill.yellow{background:#ffc107}
+.timer-fill.red{background:#dc3545}
+.timer-secs{font-size:1.4em;font-weight:bold;color:#d4af37;margin-top:4px}
+/* ── Voice bar ── */
+#voiceChatBar{position:fixed;bottom:44px;left:0;width:100%;background:rgba(10,10,10,.98);padding:8px;border-top:1px solid #333;z-index:490;text-align:center;display:none}
+#voiceChatBar.show{display:block}
+/* fix role card — no text leaking */
+.role-card.hidden .role-real{visibility:hidden}
+.role-card.hidden::after{content:'👁️ اضغط لكشف دورك'}
+.role-card.revealed .role-real{visibility:visible}
 </style>
 </head>
 <body>
@@ -189,6 +206,23 @@ input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radiu
   </div>
 </div>
 
+
+<!-- ══ PHASE TIMER ══ -->
+<div id="phaseTimerBar" style="display:none;margin:8px auto;max-width:500px;padding:0 10px">
+  <div class="timer-wrap">
+    <div class="timer-label" id="timerLabel">⏱️ وقت المرحلة</div>
+    <div class="timer-track"><div class="timer-fill green" id="timerFill" style="width:100%"></div></div>
+    <div class="timer-secs" id="timerSecs">--</div>
+  </div>
+</div>
+
+<!-- ══ VOICE BAR ══ -->
+<div id="voiceChatBar" style="position:fixed;bottom:44px;left:0;width:100%;background:rgba(10,10,10,.98);padding:8px;border-top:1px solid #333;z-index:490;text-align:center;display:none">
+  <span style="color:gold;font-weight:bold;margin-left:10px;vertical-align:middle">🎙️ الصوت:</span>
+  <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745;color:#fff;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">تشغيل المايك</button>
+  <button id="muteBtn" onclick="toggleMute()" style="display:none;background:#ffc107;color:#000;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">كتم 🔇</button>
+  <div id="audioPlayers" style="display:none"></div>
+</div>
 <!-- ══ PLAYER GAME ══ -->
 <div id="screen-player-game" class="screen">
   <div id="playerContent"></div>
@@ -358,6 +392,7 @@ function startGame(){
 // ══ Boss Game ══
 socket.on('mcBossData',(d)=>{
   show('screen-boss-game');
+  document.getElementById('voiceChatBar').style.display='block';
   renderBossSecrets(d.players);
   updateBossAliveList(d.players);
   setBossPhase('night_mafia');
@@ -476,6 +511,7 @@ socket.on('mcBackToLobby',(d)=>{
 // ══ Player Game ══
 socket.on('mcGameData',(d)=>{
   myRole=d.role;
+  document.getElementById('voiceChatBar').style.display='block';
   SS.save({...SS.load(), gameData:d, isAlive:d.isAlive});
   renderPlayerScreen(d);
 });
@@ -526,6 +562,7 @@ socket.on('mcNightAction',(d)=>{
   const btns=document.getElementById('actionBtns');
   sec.style.display='block';
 
+  if(d.timer) startTimer(d.type==='mafia_kill'?'🔪 اختار ضحيتك':'💉 اختر من تنقذ', d.timer);
   if(d.type==='mafia_kill'){
     title.textContent='🔪 اختار ضحيتك الليلة:';
     title.style.color='#ff4d4d';
@@ -561,6 +598,7 @@ socket.on('mcStartDayVoting',(d)=>{
   hasActed=false;
   const sec=document.getElementById('actionSection');
   sec.style.display='block';
+  if(d.timer) startTimer('🗳️ وقت التصويت', d.timer);
   document.getElementById('actionTitle').textContent='🗳️ صوّت على من تظنه مافيا:';
   document.getElementById('actionTitle').style.color='#d4af37';
   const btns=document.getElementById('actionBtns');
@@ -571,6 +609,7 @@ socket.on('mcStartDayVoting',(d)=>{
     btn.onclick=()=>{
       if(hasActed) return; hasActed=true;
       socket.emit('mcCastVote',{roomCode:myCode,target:t});
+      stopTimer();
       btns.querySelectorAll('.vote-btn').forEach(b=>b.disabled=true);
       btn.classList.add('selected'); btn.textContent+=' ✓';
       showToast('✅ تم إرسال صوتك!',3000);
@@ -707,6 +746,108 @@ window.addEventListener('load',()=>{
   const s=SS.load();
   if(!s.code||!s._connected){ show('screen-home'); socket.emit('mcGetLobbyList'); }
 });
+
+// ══ Phase Timer ══
+let timerInterval = null;
+socket.on('mcPhaseTimer', ({ phase, seconds }) => {
+  const labels = {
+    night_mafia: '🔪 المافيا تختار ضحيتها',
+    night_doctor: '💉 الدكتور يقرر',
+    discussion: '☀️ وقت النقاش',
+    voting: '🗳️ وقت التصويت'
+  };
+  startTimer(labels[phase] || phase, seconds);
+});
+socket.on('mcTimerExpired', (d) => {
+  stopTimer();
+  if (d.phase === 'voting' && d.autoExecute && isBoss) {
+    showToast('⏰ انتهى وقت التصويت — سيتم تنفيذ الإعدام تلقائياً!', 4000);
+    setTimeout(() => socket.emit('mcExecute', myCode), 1500);
+  } else {
+    showToast('⏰ انتهى الوقت!', 3000);
+  }
+});
+
+function startTimer(label, seconds) {
+  stopTimer();
+  const bar = document.getElementById('phaseTimerBar');
+  const lbl = document.getElementById('timerLabel');
+  const fill = document.getElementById('timerFill');
+  const secs = document.getElementById('timerSecs');
+  bar.style.display = 'block';
+  lbl.textContent = label;
+  const total = seconds;
+  let left = seconds;
+  function tick() {
+    secs.textContent = left + 's';
+    const pct = (left / total) * 100;
+    fill.style.width = pct + '%';
+    fill.className = 'timer-fill ' + (pct > 50 ? 'green' : pct > 20 ? 'yellow' : 'red');
+    if (left <= 0) { stopTimer(); return; }
+    left--;
+  }
+  tick();
+  timerInterval = setInterval(tick, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  const bar = document.getElementById('phaseTimerBar');
+  if (bar) bar.style.display = 'none';
+}
+
+// ══ WebRTC Voice ══
+let localStream; let peers = {};
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+async function initVoiceChat() {
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+    showToast('⚠️ المايك يحتاج HTTPS', 4000); return;
+  }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    document.getElementById('joinVoiceBtn').style.display = 'none';
+    document.getElementById('muteBtn').style.display = 'inline-block';
+    socket.emit('joinVoice', myCode);
+    showToast('🎙️ المايك شغال!', 3000);
+  } catch(e) {
+    showToast('❌ تعذر الوصول للمايك. تأكد من الصلاحية.', 4000);
+  }
+}
+
+function toggleMute() {
+  if (!localStream) return;
+  const track = localStream.getAudioTracks()[0];
+  track.enabled = !track.enabled;
+  document.getElementById('muteBtn').textContent = track.enabled ? 'كتم 🔇' : 'فتح 🔊';
+}
+
+socket.on('user-joined-voice', (userId) => { if (localStream) createPeer(userId, true); });
+socket.on('webrtc-offer', async (data) => {
+  if (!localStream) return;
+  const peer = createPeer(data.sender, false);
+  await peer.setRemoteDescription(new RTCSessionDescription(data.sdp));
+  const answer = await peer.createAnswer();
+  await peer.setLocalDescription(answer);
+  socket.emit('webrtc-answer', { target: data.sender, sdp: answer });
+});
+socket.on('webrtc-answer', (data) => { if (peers[data.sender]) peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp)); });
+socket.on('webrtc-ice-candidate', (data) => { if (peers[data.sender]) peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate)); });
+
+function createPeer(targetId, initiator) {
+  const peer = new RTCPeerConnection(rtcConfig);
+  peers[targetId] = peer;
+  if(localStream) localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
+  peer.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
+  peer.ontrack = e => {
+    let aud = document.createElement('audio');
+    aud.autoplay = true; aud.srcObject = e.streams[0];
+    document.getElementById('audioPlayers').appendChild(aud);
+  };
+  if (initiator) peer.createOffer().then(o => { peer.setLocalDescription(o); socket.emit('webrtc-offer', { target: targetId, sdp: o }); });
+  return peer;
+}
+
 </script>
 </body>
 </html>

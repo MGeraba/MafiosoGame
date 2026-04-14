@@ -45,7 +45,7 @@ select option{background:#222}
 /* Role Card */
 .role-card{position:relative;background:#111;border-radius:12px;padding:16px;margin:10px 0;cursor:pointer;user-select:none;transition:.3s;overflow:hidden;border:2px dashed #333}
 .role-card:hover{border-color:#555}
-.role-card.hidden .role-real{filter:blur(8px);opacity:.3}
+.role-card.hidden .role-real{filter:blur(12px);opacity:0;pointer-events:none;user-select:none}
 .role-card.hidden::after{content:'👁️ اضغط لكشف دورك';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1em;color:#888;background:rgba(0,0,0,.4);border-radius:10px}
 .role-card.revealed .role-real{filter:none;opacity:1}
 .role-real{font-size:1.6em;font-weight:bold;padding:6px 0}
@@ -176,9 +176,14 @@ select option{background:#222}
     <div id="bossCategoryDisplay" style="background:#1a2a3a;border:1px solid #1a6a9a;border-radius:8px;padding:8px;color:#7fbfff;margin:4px auto;max-width:300px">...</div>
     <span class="label" style="margin-top:8px">🔑 الكلمة السرية:</span>
     <div id="bossWordDisplay" style="font-size:1.8em;font-weight:bold;color:#d4af37;margin:6px 0">...</div>
+    <div id="bossSpyCount" style="color:#ff6b35;font-size:.85em;margin:4px 0"></div>
     <hr class="sep">
-    <h4 style="color:#00ffcc;margin-bottom:6px">🎭 الأدوار:</h4>
+    <h4 style="color:#00ffcc;margin-bottom:6px">👥 اللاعبون:</h4>
     <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:2"></div>
+    <hr class="sep">
+    <h4 style="color:#7fff7f;margin-bottom:4px">💡 التلميحات:</h4>
+    <div id="hintsDisplay"></div>
+    <button class="btn-green btn-sm" onclick="requestHint()" style="margin-top:6px">طلب تلميح جديد 💡</button>
     <hr class="sep">
     <span class="label">🎯 تخمينات الجاسوس:</span>
     <div id="spyGuessesDisplay" style="min-height:30px;text-align:right"><p style="color:#555;font-size:.85em">لا يوجد بعد</p></div>
@@ -201,6 +206,14 @@ select option{background:#222}
   </div>
 </div>
 
+<!-- ══ VOICE BAR ══ -->
+<div id="voiceChatBar" style="position:fixed;bottom:44px;left:0;width:100%;background:rgba(10,10,10,.98);padding:8px;border-top:1px solid #333;z-index:490;text-align:center;display:none">
+  <span style="color:gold;font-weight:bold;margin-left:10px;vertical-align:middle">🎙️</span>
+  <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745;color:#fff;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">تشغيل المايك</button>
+  <button id="muteBtn" onclick="toggleMute()" style="display:none;background:#ffc107;color:#000;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">كتم 🔇</button>
+  <div id="audioPlayers" style="display:none"></div>
+</div>
+
 <!-- ══ PLAYER GAME ══ -->
 <div id="screen-player-game" class="screen">
   <div id="playerContent"></div>
@@ -213,6 +226,7 @@ select option{background:#222}
     <p style="color:#aaa;font-size:.85em;margin-bottom:10px">لو خمّنت صح تفوز حتى لو اكتشفوك!</p>
     <input type="text" id="guessInput" placeholder="اكتب تخمينك...">
     <button class="btn-orange" id="guessSendBtn" onclick="submitGuess()">أرسل التخمين 🎯</button>
+    <div id="guessHistoryEl" style="margin-top:8px"></div>
     <div id="guessResultEl" style="margin-top:10px"></div>
   </div>
 </div>
@@ -331,17 +345,34 @@ function startGame(){
 }
 
 // ══ Boss Game View ══
-socket.on('impBossData',(d)=>{show('screen-boss-game');renderBossGameView(d);});
+socket.on('impBossData',(d)=>{
+  show('screen-boss-game');
+  document.getElementById('voiceChatBar').style.display='block';
+  renderBossGameView(d);
+});
 function renderBossGameView(d){
   document.getElementById('bossCategoryDisplay').textContent=d.category;
   document.getElementById('bossWordDisplay').textContent=d.word;
-  if(d.players) renderBossSecrets(d.players,d.spies||[]);
+  if(d.spyCount) document.getElementById('bossSpyCount').textContent='عدد الجواسيس: '+d.spyCount;
+  // Boss sees players list WITHOUT roles — he plays normally
+  if(d.players){
+    document.getElementById('bossSecrets').innerHTML=d.players.map(p=>
+      `<p><b style="color:#d4af37">${p.name}</b> — <span style="color:#888">؟؟؟</span></p>`
+    ).join('');
+  }
+  // Show hints if any
+  if(d.hints && d.hints.length) d.hints.forEach(h=>addHint(h));
 }
-function renderBossSecrets(players,spies=[]){
+// After reveal, boss sees full results
+function renderBossSecretsRevealed(players,spies){
   document.getElementById('bossSecrets').innerHTML=players.map(p=>{
     const isSpy=spies.includes(p.name);
     return `<p><b style="color:#d4af37">${p.name}</b> — <span class="${isSpy?'spy-badge':'normal-badge'}">${isSpy?'🕵️ جاسوس':'✅ طبيعي'}</span></p>`;
   }).join('');
+}
+function addHint(h){
+  const el=document.getElementById('hintsDisplay');
+  if(el) el.innerHTML+=`<div style="background:#1a2a1a;border:1px solid #2d5a2d;border-radius:6px;padding:6px 10px;margin:3px 0;color:#7fff7f;font-size:.9em">💡 ${h}</div>`;
 }
 
 // البوس يصوت
@@ -376,6 +407,12 @@ socket.on('impSpyGuessReceived',(d)=>{
   el.innerHTML+=`<div class="${cls}" style="margin:4px 0"><b>${d.by}</b>: "${d.guess}" — ${d.result} ${d.reason?'('+d.reason+')':''}</div>`;
 });
 
+function requestHint(){
+  socket.emit('impRequestHint',{roomCode:myCode});
+  showToast('جاري توليد تلميح...',2000);
+}
+socket.on('impNewHint',(d)=>{addHint(d.hint);showToast('💡 تلميح جديد!',3000);});
+
 function startVoting(){
   socket.emit('impStartVoting',myCode);
   document.getElementById('btnStartVote').disabled=true;
@@ -387,11 +424,18 @@ socket.on('impVotingStarted',()=>{document.getElementById('btnReveal').style.dis
 function revealAndScore(){socket.emit('impRevealResult',myCode);document.getElementById('btnReveal').disabled=true;}
 
 // ══ Player Game ══
-socket.on('impGameData',(d)=>{amISpy=d.isSpy;SS.save({...SS.load(),gameData:d});renderPlayerScreen(d);});
+socket.on('impGameData',(d)=>{amISpy=d.isSpy;SS.save({...SS.load(),gameData:d});renderPlayerScreen(d);document.getElementById('voiceChatBar').style.display='block';});
 socket.on('impPlayerReconnected',(d)=>{if(d.gameData){amISpy=d.gameData.isSpy;renderPlayerScreen(d.gameData);}else{show('screen-wait');document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';}});
 
 function renderPlayerScreen(d){
   show('screen-player-game');amISpy=d.isSpy;
+  // show previous hints if any
+  if(d.hints && d.hints.length && !d.isSpy){
+    setTimeout(()=>{
+      const el=document.getElementById('playerHints');
+      if(el) d.hints.forEach(h=>el.innerHTML+=`<div style="background:#1a2a1a;border:1px solid #2d5a2d;border-radius:6px;padding:6px 10px;margin:3px 0;color:#7fff7f;font-size:.85em">💡 ${h}</div>`);
+    },300);
+  }
   const hint=d.spectator?`<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;color:#888">👀 أنت مشاهد فقط</div>`
     :d.isSpy?`<div style="background:#1a0505;border:1px solid #8b0000;border-radius:8px;padding:10px;margin:8px 0;color:#ff6b6b">🕵️ أنت الجاسوس! حاول تعرف الكلمة السرية من النقاش.</div>`
     :`<div style="background:#0a1a1a;border:1px solid #1a6a4a;border-radius:8px;padding:10px;margin:8px 0"><span style="color:#888;font-size:.85em">📦 الفئة: </span><b style="color:#7fbfff">${d.category}</b><br><span style="color:#888;font-size:.85em;margin-top:4px;display:block">🔑 الكلمة: </span><b style="color:#00ffcc;font-size:1.3em">${d.word}</b></div>`;
@@ -405,6 +449,7 @@ function renderPlayerScreen(d){
         <div class="role-real ${d.isSpy?'spy-badge':'normal-badge'}">${d.isSpy?'🕵️ جاسوس':'✅ طبيعي'}</div>
         <p style="color:#555;font-size:.75em;margin-top:4px">دورك السري</p>
       </div>`:''}
+      <div id="playerHints" style="margin-top:8px"></div>
       <button class="btn-gray btn-sm" style="margin-top:10px" onclick="leaveRoom()">مغادرة 🚪</button>
     </div>`;
 }
@@ -441,6 +486,11 @@ function submitGuess(){
   showToast('✅ تم إرسال تخمينك، جاري المراجعة...',4000);
 }
 
+socket.on('impGuessHistory',(guesses)=>{
+  const el=document.getElementById('guessHistoryEl');
+  if(!el) return;
+  el.innerHTML=guesses.map(g=>`<div style="background:#1a1a2a;border-radius:6px;padding:5px 8px;margin:3px 0;font-size:.85em">${g.guess} → <b style="color:${g.result==='صحيح'?'#28a745':g.result==='قريب'?'#ffc107':'#dc3545'}">${g.result}</b></div>`).join('');
+});
 socket.on('impGuessResult',(d)=>{
   const cls=d.result==='صحيح'?'guess-correct':d.result==='قريب'?'guess-close':'guess-wrong';
   const icon=d.result==='صحيح'?'✅':d.result==='قريب'?'🟡':'❌';
@@ -450,6 +500,11 @@ socket.on('impGuessResult',(d)=>{
 
 // ══ Result ══
 socket.on('impResult',(d)=>{
+  // now we can show who was spy
+  if(isBoss && d.spies) renderBossSecretsRevealed(
+    Object.values(d).length ? [] : [],  // players not in result, skip
+    d.spies
+  );
   SS.clear();
   let html=`<b style="font-size:1.1em">${d.title}</b>\n\n`;
   html+=`<span style="color:#ff6b35">🕵️ الجواسيس: </span><b>${d.spies.join(' و ')}</b>\n`;
@@ -546,6 +601,50 @@ window.addEventListener('load',()=>{
   const s=SS.load();
   if(!s.code||!s._connected){show('screen-home');socket.emit('impGetLobbyList');}
 });
+
+// ══ WebRTC Voice ══
+let localStream; let peers = {};
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+async function initVoiceChat() {
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+    showToast('⚠️ المايك يحتاج HTTPS', 4000); return;
+  }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    document.getElementById('joinVoiceBtn').style.display = 'none';
+    document.getElementById('muteBtn').style.display = 'inline-block';
+    socket.emit('joinVoice', myCode);
+    showToast('🎙️ المايك شغال!', 3000);
+  } catch(e) {
+    showToast('❌ تعذر الوصول للمايك.', 4000);
+  }
+}
+function toggleMute() {
+  if (!localStream) return;
+  const t = localStream.getAudioTracks()[0];
+  t.enabled = !t.enabled;
+  document.getElementById('muteBtn').textContent = t.enabled ? 'كتم 🔇' : 'فتح 🔊';
+}
+socket.on('user-joined-voice', (id) => { if (localStream) createPeer(id, true); });
+socket.on('webrtc-offer', async (d) => {
+  if (!localStream) return;
+  const p = createPeer(d.sender, false);
+  await p.setRemoteDescription(new RTCSessionDescription(d.sdp));
+  const a = await p.createAnswer(); await p.setLocalDescription(a);
+  socket.emit('webrtc-answer', { target: d.sender, sdp: a });
+});
+socket.on('webrtc-answer', (d) => { if (peers[d.sender]) peers[d.sender].setRemoteDescription(new RTCSessionDescription(d.sdp)); });
+socket.on('webrtc-ice-candidate', (d) => { if (peers[d.sender]) peers[d.sender].addIceCandidate(new RTCIceCandidate(d.candidate)); });
+function createPeer(targetId, initiator) {
+  const p = new RTCPeerConnection(rtcConfig); peers[targetId] = p;
+  if(localStream) localStream.getTracks().forEach(t => p.addTrack(t, localStream));
+  p.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
+  p.ontrack = e => { const a = document.createElement('audio'); a.autoplay=true; a.srcObject=e.streams[0]; document.getElementById('audioPlayers').appendChild(a); };
+  if (initiator) p.createOffer().then(o => { p.setLocalDescription(o); socket.emit('webrtc-offer', { target: targetId, sdp: o }); });
+  return p;
+}
+
 </script>
 </body>
 </html>

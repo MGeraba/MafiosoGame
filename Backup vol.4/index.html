@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mafioso Trial 🕵️</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh}
+        h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
+        .card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
+        button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s}
+        button:active{transform:scale(.95);background:#ffdf00}
+        input,textarea{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radius:8px;width:90%;margin:8px 0;font-size:16px;box-sizing:border-box}
+        textarea{height:80px;resize:vertical}
+        .screen{display:none}
+        .player-tag{display:inline-block;background:#222;padding:8px 15px;border-radius:20px;margin:5px;font-size:14px;color:#00ffcc;border:1px solid #00ffcc}
+        .loader{border:4px solid #333;border-top:4px solid #d4af37;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
+        /* ── Connection Bar ── */
+        #conn-bar{position:fixed;top:0;left:0;right:0;padding:7px;font-size:13px;text-align:center;z-index:9999;display:none;transition:.3s}
+        #conn-bar.offline{background:#c0392b;display:block}
+        #conn-bar.online{background:#27ae60;display:block;animation:fadeBar 2s 1.5s forwards}
+        @keyframes fadeBar{to{opacity:0;pointer-events:none}}
+
+        /* ── Panic Overlay ── */
+        #panicOverlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(160,0,0,.95);flex-direction:column;align-items:center;justify-content:center;animation:flashRed .5s infinite alternate}
+        #panicOverlay.active{display:flex}
+        @keyframes flashRed{from{background:rgba(160,0,0,.95)}to{background:rgba(255,20,20,.98)}}
+        .panic-title{font-size:2.2em;font-weight:bold;letter-spacing:4px;color:#fff;text-shadow:0 0 20px #f00}
+        .panic-timer{font-size:5em;font-weight:bold;color:#fff;margin:10px 0;text-shadow:0 0 30px #ff0}
+        #panicTwistText{font-size:1em;color:#ffe;max-width:400px;line-height:1.6;margin-top:10px;padding:0 20px;font-style:italic}
+
+        /* ── Clues Panel ── */
+        #clues-panel{text-align:right}
+        .clue-item{background:#0d1f0d;border:1px solid #2d6a2d;border-radius:8px;padding:10px 14px;margin:6px 0}
+        .clue-meta{font-size:.75em;color:#666;margin-bottom:4px}
+        .clue-text{color:#7fff7f;line-height:1.5;font-size:.95em}
+
+        /* ── QR Code ── */
+        #qrcode{margin:10px auto;display:flex;justify-content:center}
+        #qrcode img,#qrcode canvas{border-radius:8px;border:3px solid #d4af37;background:#fff;padding:6px}
+
+        /* ── Story Box ── */
+        .story-box{background:#0a1520;border:1px solid #1a4a7a;border-radius:8px;padding:12px 16px;text-align:right;line-height:1.7;font-size:1em;color:#b0d4f1;margin:10px 0}
+
+        /* ── Result Message ── */
+        #resultOverlay{display:none;position:fixed;inset:0;z-index:8000;align-items:center;justify-content:center;flex-direction:column;padding:20px;background:rgba(0,0,0,.88)}
+        #resultOverlay.active{display:flex}
+        .result-box{background:#151515;border:2px solid #d4af37;border-radius:16px;padding:28px;max-width:420px;width:100%}
+        .result-icon{font-size:4em;margin-bottom:10px}
+        .result-msg{font-size:1.1em;line-height:1.7;margin-bottom:20px;color:#eee}
+
+        /* ── Toast ── */
+        #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;border:1px solid #d4af37;color:#fff;padding:12px 22px;border-radius:10px;z-index:9999;max-width:90%;font-size:14px;display:none;text-align:center}
+
+        /* ── Ghost Badge ── */
+        .ghost-badge{background:#333;color:#888;border:1px solid #555;border-radius:20px;padding:4px 12px;font-size:.85em;margin:8px auto;display:inline-block}
+
+        /* ── Misc ── */
+        .sep{border:none;border-top:1px solid #2a2a2a;margin:12px 0}
+        .label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right;display:block}
+        .badge-mafia{color:#ff4d4d;font-size:1.3em;font-weight:bold}
+        .badge-civ{color:#00ffcc;font-size:1.3em;font-weight:bold}
+        .btn-danger{background:#dc3545!important;color:#fff!important}
+        .btn-green{background:#28a745!important;color:#fff!important}
+        .btn-blue{background:#17a2b8!important;color:#fff!important}
+        .btn-gray{background:#444!important;color:#fff!important}
+        .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
+
+        body { padding-bottom: 100px !important; }
+
+        /* ── Ghost Chat ══ */
+        .ghost-chat {
+            position: fixed;
+            bottom: 100px;
+            right: 10px;
+            width: 280px;
+            max-height: 300px;
+            background: #0a0a0a;
+            border: 1px solid #555;
+            border-radius: 12px;
+            display: none;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .ghost-chat.active {
+            display: flex;
+        }
+        .ghost-chat-header {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 12px 12px 0 0;
+            color: #888;
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ghost-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            max-height: 200px;
+        }
+        .ghost-chat-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #333;
+        }
+        .ghost-chat-input input {
+            flex: 1;
+            margin: 0;
+            margin-left: 8px;
+        }
+        .ghost-msg {
+            margin: 4px 0;
+            padding: 6px 10px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        .ghost-msg-name {
+            color: #d4af37;
+            font-size: 0.8em;
+            margin-bottom: 2px;
+        }
+        .ghost-msg-text {
+            color: #aaa;
+        }
+
+        /* ── Role Toggle ── */
+        .role-hidden {
+            color: transparent !important;
+            background-color: #333 !important;
+            text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+            border-color: #555 !important;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+        .role-visible {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+        .role-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            background: #1a1a1a;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px dashed #555;
+        }
+
+        /* ── Timer ── */
+        .timer-container {
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a0a0a;
+            border: 2px solid #d4af37;
+            border-radius: 12px;
+            padding: 10px 20px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 20px rgba(212,175,55,0.3);
+        }
+        .timer-container.active {
+            display: block;
+            animation: pulseTimer 1s infinite;
+        }
+        @keyframes pulseTimer {
+            0%, 100% { box-shadow: 0 4px 20px rgba(212,175,55,0.3); }
+            50% { box-shadow: 0 4px 30px rgba(212,175,55,0.6); }
+        }
+        .timer-bar {
+            width: 200px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .timer-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #d4af37, #ff6b35);
+            border-radius: 3px;
+            transition: width 1s linear;
+        }
+        .timer-text {
+            color: #d4af37;
+            font-weight: bold;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .timer-label {
+            font-size: 0.7em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .timer-urgent {
+            color: #ff4d4d !important;
+            animation: blink 0.5s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Ghost Chat -->
+<div id="ghostChat" class="ghost-chat">
+    <div class="ghost-chat-header">
+        <span>👻 شات الأشباح</span>
+        <button onclick="toggleGhostChat()" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2em">×</button>
+    </div>
+    <div id="ghostChatMessages" class="ghost-chat-messages"></div>
+    <div class="ghost-chat-input">
+        <input type="text" id="ghostChatInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendGhostMessage()">
+        <button onclick="sendGhostMessage()" class="btn-sm" style="width:auto">📤</button>
+    </div>
+</div>
+
+<!-- Panic Overlay -->
+<div id="panicOverlay">
+    <div class="panic-title">🚨 PANIC MODE 🚨</div>
+    <div class="panic-timer" id="panicTimer">10</div>
+    <div id="panicTwistText"></div>
+</div>
+
+<!-- Execution Result Overlay -->
+<div id="resultOverlay">
+    <div class="result-box">
+        <div class="result-icon" id="resultIcon">⚖️</div>
+        <div class="result-msg" id="resultMsg"></div>
+        <button onclick="closeResult()">حسناً</button>
+    </div>
+</div>
+
+<!-- Connection Bar -->
+<div id="conn-bar"></div>
+
+<!-- Timer Component -->
+<div id="timerContainer" class="timer-container">
+    <div class="timer-text">
+        <span id="timerLabel">الوقت</span>
+        <span id="timerValue">30</span>
+    </div>
+    <div class="timer-bar">
+        <div id="timerFill" class="timer-fill" style="width: 100%"></div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ══════════════════ HOME ══════════════════ -->
+<div id="screen-home" class="screen" style="display:block">
+    <h1>🕵️‍♂️ MAFIOSO TRIAL</h1>
+
+    <!-- اختيار اللعبة -->
+    <div id="game-select-view">
+        <p style="color:#888;margin-bottom:15px;font-size:.95em">اختار اللعبة اللي تحب تلعبها</p>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('mafioso')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🕵️‍♂️</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">مافيوسو تريال</h3>
+            <p style="color:#888;font-size:.85em">قصة جريمة بالذكاء الاصطناعي — المافيا والمواطنين والأدلة</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('classic')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🌙</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">المافيا الكلاسيك</h3>
+            <p style="color:#888;font-size:.85em">مافيا + دكتور + مواطنين — الليل والنهار بدون قصة</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('impostor')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🕵️</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">الإمبوستر</h3>
+            <p style="color:#888;font-size:.85em">اعرف الكلمة السرية... أو كن الجاسوس!</p>
+        </div>
+    </div>
+
+    <!-- واجهة المافيوسو تريال -->
+    <div id="mafioso-join-view" style="display:none">
+        <button class="btn-gray btn-sm" onclick="backToGameSelect()" style="margin-bottom:10px">← رجوع</button>
+        <div class="card">
+            <div style="font-size:1.5em;margin-bottom:4px">🕵️‍♂️</div>
+            <h3 style="color:#d4af37;margin-bottom:10px">مافيوسو تريال</h3>
+            <button class="btn-green" onclick="createRoom()">إنشاء غرفة — أنا البوس 👑</button>
+            <hr class="sep">
+            <input type="text" id="playerName" placeholder="اكتب اسمك الحقيقي">
+            <input type="text" id="roomCodeInput" placeholder="كود الغرفة" style="letter-spacing:6px;text-transform:uppercase;text-align:center;font-size:20px" oninput="this.value=this.value.toUpperCase()">
+            <button class="btn-gray" onclick="joinRoom()">انضمام كلاعب 👤</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ WAITING ══════════════════ -->
+<div id="screen-wait" class="screen">
+    <div class="card" style="margin-top:40px">
+        <div class="loader"></div>
+        <h2 style="color:#d4af37;margin:10px 0">تم الانضمام ✅</h2>
+        <p id="wait-name" style="color:#00ffcc;font-weight:bold;font-size:1.1em"></p>
+        <p style="color:#888;margin-top:8px">انتظر البوس يبدأ الجيم...</p>
+        <p style="font-size:.8em;color:#555;margin-top:10px">(لا تغلق الصفحة)</p>
+    </div>
+</div>
+
+<!-- ══════════════════ BOSS LOBBY ══════════════════ -->
+<div id="screen-boss-lobby" class="screen">
+    <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
+
+    <!-- QR + Code -->
+    <div class="card">
+        <div id="qrcode"></div>
+        <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
+        <p style="color:#888;font-size:.85em">اللاعبون يسكنوا الـ QR أو يكتبوا الكود</p>
+        <button class="btn-blue btn-sm" onclick="shareRoom()" style="margin-top:8px">مشاركة الغرفة 📤</button>
+    </div>
+
+    <div class="card">
+        <h3 style="color:#d4af37;margin-bottom:10px">تجهيز الجولة</h3>
+        <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
+        <textarea id="tricks" placeholder="تريكات أو تفاصيل للقصة (اختياري)"></textarea>
+        <hr class="sep">
+        <span class="label">اللاعبون المتصلون:</span>
+        <div id="pList" style="margin:8px 0">انتظار...</div>
+        <p id="pCount" style="color:#888;font-size:.85em"></p>
+        <button id="startBtn" class="btn-green" onclick="startGame()" style="display:none">ابدأ الجيم 🚀</button>
+        <button class="btn-danger" onclick="closeRoom()">إغلاق الغرفة ❌</button>
+    </div>
+</div>
+
+<!-- ══════════════════ BOSS IN GAME ══════════════════ -->
+<div id="screen-boss-game" class="screen">
+    <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
+
+    <!-- القصة للبوس -->
+    <div class="card">
+        <span class="label">📖 القصة الكاملة (للبوس فقط)</span>
+        <div class="story-box" id="bossStory"></div>
+    </div>
+
+    <!-- الأدوار الحقيقية -->
+    <div class="card">
+        <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار الحقيقية</h4>
+        <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:1.8"></div>
+    </div>
+
+    <!-- الأدلة والهنتات (ثابتة تتراكم) -->
+    <div class="card">
+        <h4 style="color:#7fff7f;margin-bottom:8px">🔍 الأدلة والهنتات</h4>
+        <div id="clues-panel"><p style="color:#555;font-size:.9em">جاري توليد أول دليل...</p></div>
+        <hr class="sep">
+        <button class="btn-blue btn-sm" onclick="requestClue()">طلب دليل جديد 🔍</button>
+    </div>
+
+    <!-- Plot Twist من Panic -->
+    <div class="card" id="twistCard" style="display:none">
+        <h4 style="color:#ff6b6b;margin-bottom:8px">🌀 Plot Twist!</h4>
+        <div id="twistText" style="text-align:right;color:#ffb3b3;line-height:1.6;font-style:italic"></div>
+    </div>
+
+    <!-- التصويت -->
+    <div class="card">
+        <h4 style="margin-bottom:8px">📊 نتائج التصويت</h4>
+        <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
+        <hr class="sep">
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+            <button class="btn-green btn-sm" id="btnStartVote" onclick="startVotingPhase()">بدء التصويت 🗳️</button>
+            <button class="btn-danger btn-sm" onclick="confirmExecution()">تثبيت الإعدام 💀</button>
+            <button class="btn-blue btn-sm" onclick="triggerPanic()">PANIC MODE 🚨</button>
+            <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء الجيم ❌</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ PLAYER IN GAME ══════════════════ -->
+<div id="screen-player-game" class="screen">
+    <div id="playerContent"></div>
+
+    <!-- Ghost notice -->
+    <div id="ghostNotice" style="display:none" class="card">
+        <p style="color:#888">👻 أنت خرجت من اللعبة</p>
+        <div id="ghostVoteSection"></div>
+    </div>
+
+    <!-- Vote UI -->
+    <div id="vUI" style="display:none" class="card">
+        <h3 style="margin-bottom:10px">🗳️ صوّت ضد المافيوسو:</h3>
+        <div id="vBtns"></div>
+    </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  State & Session - SECURE VERSION (No role storage)
+// ════════════════════════════════════════════════
+const socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000
+});
+
+let myCode='', myName='', isBoss=false, currentRole=null, isAlive=true, isGhost=false;
+
+const SS = {
+    // بس الكود والاسم، مفيش gameData أو roles!
+    save(d){ 
+        try{
+            const safeData = {
+                code: d.code,
+                name: d.name,
+                isBoss: d.isBoss,
+                bossToken: d.bossToken,
+                _connected: d._connected
+            };
+            localStorage.setItem('mfss', JSON.stringify(safeData));
+        }catch(e){} 
+    },
+    load(){ 
+        try{
+            return JSON.parse(localStorage.getItem('mfss')||'{}');
+        }catch(e){
+            return{};
+        } 
+    },
+    clear(){ 
+        try{localStorage.removeItem('mfss')}catch(e){} 
+    }
+};
+
+// ════════════════════════════════════════════════
+//  Timer System
+// ════════════════════════════════════════════════
+let timerInterval = null;
+let timeLeft = 0;
+let totalTime = 0;
+
+function startTimer(seconds, label, onComplete) {
+    clearInterval(timerInterval);
+    timeLeft = seconds;
+    totalTime = seconds;
+    
+    const container = document.getElementById('timerContainer');
+    const valueEl = document.getElementById('timerValue');
+    const labelEl = document.getElementById('timerLabel');
+    const fillEl = document.getElementById('timerFill');
+    
+    container.classList.add('active');
+    labelEl.textContent = label;
+    valueEl.textContent = seconds;
+    valueEl.classList.remove('timer-urgent');
+    fillEl.style.width = '100%';
+    fillEl.style.background = 'linear-gradient(90deg, #d4af37, #ff6b35)';
+    
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        valueEl.textContent = timeLeft;
+        
+        // Progress bar
+        const percentage = (timeLeft / totalTime) * 100;
+        fillEl.style.width = percentage + '%';
+        
+        // Urgent color
+        if(timeLeft <= 5) {
+            valueEl.classList.add('timer-urgent');
+            fillEl.style.background = '#ff4d4d';
+        }
+        
+        if(timeLeft <= 0) {
+            clearInterval(timerInterval);
+            container.classList.remove('active');
+            if(onComplete) onComplete();
+        }
+    }, 1000);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+    document.getElementById('timerContainer').classList.remove('active');
+}
+
+// ════════════════════════════════════════════════
+//  Connection
+// ════════════════════════════════════════════════
+const connBar = document.getElementById('conn-bar');
+
+socket.on('disconnect', ()=>{
+    connBar.textContent='⚠️ انقطع الاتصال — جاري إعادة الاتصال...';
+    connBar.className='offline';
+});
+
+socket.on('connect', ()=>{
+    const sess = SS.load();
+    if(!sess.code) return;
+
+    if(sess._connected){
+        connBar.textContent='✅ رجع الاتصال!';
+        connBar.className='online';
+    }
+    sess._connected=true; SS.save(sess);
+
+    myCode=sess.code; myName=sess.name; isBoss=sess.isBoss;
+
+    if(isBoss){
+        socket.emit('bossReconnect',{roomCode:sess.code, bossToken:sess.bossToken});
+    } else {
+        // ⚠️ مفيش restorePlayerScreen - نستنى السيرفر يبعت الداتا من اول وجديد
+        show('screen-wait');
+        document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
+        socket.emit('playerReconnect',{roomCode:sess.code, playerName:sess.name});
+    }
+});
+
+// ════════════════════════════════════════════════
+//  Room Ended (from boss closeRoom or server)
+// ════════════════════════════════════════════════
+socket.on('roomEnded', ()=>{
+    SS.clear();
+    showToast('الغرفة أُغلقت من البوس', 3000);
+    setTimeout(()=>{ location.reload(); }, 2000);
+});
+
+// ════════════════════════════════════════════════
+//  Boss — Create
+// ════════════════════════════════════════════════
+function createRoom(){
+    isBoss=true;
+    socket.emit('createRoom');
+}
+
+socket.on('roomCreated', (c)=>{
+    myCode=c;
+    SS.save({code:c, name:'Boss', isBoss:true, bossToken:socket.id, _connected:false});
+    initBossLobby(c);
+    show('screen-boss-lobby');
+});
+
+function initBossLobby(c){
+    document.getElementById('bossRoomTitle').textContent='الغرفة: '+c;
+    document.getElementById('lobbyCode').textContent=c;
+    document.getElementById('bossGameTitle').textContent='البوس — الغرفة: '+c;
+    // QR Code
+    const qrDiv = document.getElementById('qrcode');
+    qrDiv.innerHTML='';
+    const url = window.location.origin+'?code='+c;
+    new QRCode(qrDiv,{text:url, width:160, height:160, colorDark:'#000', colorLight:'#fff'});
+}
+
+socket.on('bossReconnected', (data)=>{
+    initBossLobby(myCode);
+    if(data.started){
+        show('screen-boss-game');
+        if(data.scenario) document.getElementById('bossStory').textContent=data.scenario.story;
+        if(data.players) renderBossSecrets(data.players);
+        if(data.clues && data.clues.length>0){
+            document.getElementById('clues-panel').innerHTML='';
+            data.clues.forEach(c=>addClue(c));
+        }
+    } else {
+        show('screen-boss-lobby');
+        if(data.players && data.players.length>0) updatePlayerList(data.players);
+    }
+});
+
+// ════════════════════════════════════════════════
+//  Player — Join
+// ════════════════════════════════════════════════
+function joinRoom(){
+    const n=document.getElementById('playerName').value.trim();
+    const c=document.getElementById('roomCodeInput').value.trim().toUpperCase();
+    if(!n||!c){showToast('اكتب اسمك والكود!');return;}
+    myCode=c; myName=n;
+    SS.save({code:c, name:n, isBoss:false, _connected:false});
+    socket.emit('joinRoom',{roomCode:c, playerName:n});
+}
+
+socket.on('joinedSuccess', (data)=>{
+    if(!data?.reconnected){
+        show('screen-wait');
+        document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
+    }
+});
+
+// ════════════════════════════════════════════════
+//  Ghost Chat System
+// ════════════════════════════════════════════════
+function toggleGhostChat() {
+    const chat = document.getElementById('ghostChat');
+    chat.classList.toggle('active');
+}
+
+function sendGhostMessage() {
+    const input = document.getElementById('ghostChatInput');
+    const msg = input.value.trim();
+    if(!msg) return;
+    
+    socket.emit('ghostMessage', { roomCode: myCode, message: msg });
+    input.value = '';
+}
+
+socket.on('ghostMessage', (d) => {
+    // نعرض بس لو انت ميت
+    if(!isAlive) {
+        const container = document.getElementById('ghostChatMessages');
+        const div = document.createElement('div');
+        div.className = 'ghost-msg';
+        div.innerHTML = '<div class="ghost-msg-name">' + d.name + '</div><div class="ghost-msg-text">' + d.message + '</div>';
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        
+        // نفتح الشات لو مقفول
+        document.getElementById('ghostChat').classList.add('active');
+    }
+});
+
+// ════════════════════════════════════════════════
+//  Players List (Boss Lobby)
+// ════════════════════════════════════════════════
+function updatePlayerList(players){
+    const list=document.getElementById('pList');
+    const cnt=document.getElementById('pCount');
+    if(!players.length){
+        list.innerHTML='<span style="color:#555">انتظار...</span>';
+        cnt.textContent='';
+        document.getElementById('startBtn').style.display='none';
+        return;
+    }
+    list.innerHTML=players.map(p=>'<span class="player-tag">👤 '+p.name+'</span>').join('');
+    cnt.textContent='✅ '+players.length+' لاعب جاهز';
+    document.getElementById('startBtn').style.display='block';
+}
+socket.on('updatePlayers', updatePlayerList);
+
+// ════════════════════════════════════════════════
+//  Start Game
+// ════════════════════════════════════════════════
+function startGame(){
+    const btn=document.getElementById('startBtn');
+    btn.textContent='جاري التحميل... ✨';
+    btn.disabled=true;
+    socket.emit('startGame',{
+        roomCode:myCode,
+        crimeType:document.getElementById('crimeType').value,
+        tricks:document.getElementById('tricks').value
+    });
+}
+socket.on('error', (msg) => {
+    alert("⚠️ " + msg);
+    const startBtn = document.getElementById('startBtn');
+    if(startBtn) startBtn.innerText = "ابدأ الجيم 🚀";
+});
+// ════════════════════════════════════════════════
+//  Boss Game Data
+// ════════════════════════════════════════════════
+socket.on('bossData', (d)=>{
+    show('screen-boss-game');
+    document.getElementById('bossStory').textContent=d.story;
+    renderBossSecrets(d.players);
+});
+
+function renderBossSecrets(players){
+    document.getElementById('bossSecrets').innerHTML=players.map(p=>
+        '<p><b style="color:#d4af37">'+p.name+'</b> ← <span style="color:#aaa">'+p.charName+'</span> — <span class="'+(p.role.includes('🔪')?'badge-mafia':'badge-civ')+'">'+p.role+'</span></p>'
+    ).join('');
+}
+
+// ════════════════════════════════════════════════
+//  Clues (Boss Only, Persistent)
+// ════════════════════════════════════════════════
+function addClue(clueObj){
+    const panel=document.getElementById('clues-panel');
+    if(panel.querySelector('p')) panel.innerHTML='';
+    
+    const div=document.createElement('div');
+    div.className='clue-item';
+    div.innerHTML='<div class="clue-meta">جولة '+clueObj.round+' — '+clueObj.time+'</div><div class="clue-text">🔍 '+clueObj.text+'</div>';
+    
+    if(isBoss) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-gray btn-sm';
+        btn.style.marginTop = '8px';
+        btn.textContent = 'إرسال للاعبين 📢';
+        btn.onclick = () => {
+            socket.emit('shareClue', { roomCode: myCode, clue: clueObj });
+            showToast('✅ تم إرسال الدليل للاعبين!', 3000);
+            btn.disabled = true;
+            btn.textContent = 'تم الإرسال ✔️';
+        };
+        div.appendChild(btn);
+    }
+    
+    panel.appendChild(div);
+    panel.scrollTop=panel.scrollHeight;
+}
+
+// استقبال اللاعبين للدليل من البوس
+socket.on('clueShared', (clueObj) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += '<div style="border-bottom:1px solid #2d6a2d; padding-bottom:5px; margin-bottom:5px;"><span style="font-size:0.7em; color:#888;">جولة '+clueObj.round+':</span> <span style="color:#7fff7f; font-size:0.95em;">'+clueObj.text+'</span></div>';
+            showToast('📢 البوس أرسل دليلاً جديداً، اقرأه الآن!', 5000);
+        }
+    }
+});
+// استقبال اللاعبين للحدث المفاجئ (التويست)
+socket.on('twistShared', (twist) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += '<div style="border-bottom:1px dashed #ff6b6b; padding-bottom:8px; margin-bottom:8px; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px;"><span style="font-size:0.85em; color:#ff6b6b; font-weight:bold;">🚨 حدث مفاجئ (Plot Twist):</span><br><span style="color:#ffb3b3; font-size:1em; font-style:italic;">'+twist+'</span></div>';
+            showToast('🚨 البوس أرسل حدثاً مفاجئاً، انتبه!', 5000);
+        }
+    }
+});
+
+socket.on('receiveClue', (clueObj)=>{
+    addClue(clueObj);
+    showToast('🔍 دليل جديد وصل!', 2500);
+});
+
+function requestClue(){
+    socket.emit('requestPhysicalClue', myCode);
+    showToast('جاري توليد دليل...', 2000);
+}
+
+// ════════════════════════════════════════════════
+//  Player Game Data
+// ════════════════════════════════════════════════
+socket.on('gameData', (d)=>{
+    currentRole = d.role;
+    isAlive = d.isAlive;
+    restorePlayerScreen(d, false, d.isAlive);
+});
+
+function restorePlayerScreen(d, alreadyVoted, aliveStatus){
+    show('screen-player-game');
+    const isMafia=d.role.includes('🔪');
+    isAlive = aliveStatus;
+    isGhost = !aliveStatus;
+    
+    let roleDisplay = '';
+    let secretDisplay = '';
+    
+    // لو ميت، شوف كل حاجة (Spectator Mode)
+    if(!aliveStatus){
+        roleDisplay = '<span class="badge-civ">👻 شبح (متفرج)</span>';
+        secretDisplay = '<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🎭 دورك الأصلي كان:</span><p style="color:#d4af37;margin-top:4px;font-weight:bold">'+d.role+'</p></div>';
+    } else {
+        // لو عايش، الدور مخفي
+        roleDisplay = '<span id="mySecretRole" class="role-hidden '+(isMafia?'badge-mafia':'badge-civ')+'">'+d.role+'</span>';
+        secretDisplay = '<div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span><p style="color:#00ffcc;margin-top:4px">'+d.charSecret+'</p></div>';
+    }
+    
+    document.getElementById('playerContent').innerHTML='\
+        <div class="card">\
+            <h2 style="color:#d4af37;margin-bottom:6px">'+d.charName+'</h2>\
+            <div class="story-box">'+d.story+'</div>\
+            '+secretDisplay+'\
+            '+(aliveStatus ? '<p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>\
+            <div class="role-container" onclick="toggleRole()">\
+                <span style="font-size: 1.8em;">👁️</span>\
+                '+roleDisplay+'\
+            </div>' : '<div class="role-container" style="border-color:#555;">\
+                <span style="font-size: 1.8em;">👻</span>\
+                '+roleDisplay+'\
+            </div>\
+            <p style="color:#888;font-size:.8em;margin-top:10px;">أنت الآن متفرج، تقدر تشوف كل الأدوار!</p>')+'\
+            <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">\
+                <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>\
+                <div id="playerCluesList"></div>\
+            </div>\
+        </div>';
+
+    const ghostDiv=document.getElementById('ghostNotice');
+    document.getElementById('vUI').style.display='none';
+    
+    if(!aliveStatus){
+        ghostDiv.style.display='block';
+        // فتح شات الأشباح
+        document.getElementById('ghostChat').classList.add('active');
+        // Spectator Mode: نطلب من السيرفر يبعتنا كل الأدوار
+        socket.emit('requestSpectatorData', myCode);
+    } else {
+        ghostDiv.style.display='none';
+    }
+}
+
+// دالة تشغيل العين
+function toggleRole() {
+    const roleSpan = document.getElementById('mySecretRole');
+    if(roleSpan.classList.contains('role-hidden')) {
+        roleSpan.classList.remove('role-hidden');
+        roleSpan.classList.add('role-visible');
+    } else {
+        roleSpan.classList.add('role-hidden');
+        roleSpan.classList.remove('role-visible');
+    }
+}
+
+// ════════════════════════════════════════════════
+//  Voting
+// ════════════════════════════════════════════════
+function renderVoteButtons(chars, ghostVoting){
+    const vUI=document.getElementById('vUI');
+    const ghostDiv=document.getElementById('ghostNotice');
+    const ghostVoteSec=document.getElementById('ghostVoteSection');
+    const vBtns=document.getElementById('vBtns');
+
+    if(!chars || chars.length===0){
+        vUI.style.display='none';
+        if(ghostVoteSec) ghostVoteSec.innerHTML = '';
+        return;
+    }
+
+    // تصويت الميتين (حالة الـ 1v1)
+    if(ghostVoting){
+        ghostDiv.style.display='block';
+        ghostVoteSec.innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — ساعد المدينة! حدد مين المافيوسو:</p>';
+        chars.forEach(char=>{
+            const btn=document.createElement('button');
+            btn.className = 'btn-blue';
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                ghostVoteSec.innerHTML='<p style="color:#27ae60">✅ تم تسجيل صوتك كشبح!</p>';
+            };
+            ghostVoteSec.appendChild(btn);
+        });
+        vUI.style.display='none';
+    } 
+    // تصويت الأحياء العادي
+    else {
+        vUI.style.display='block';
+        vBtns.innerHTML='';
+        chars.forEach(char=>{
+            const btn=document.createElement('button');
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                vUI.style.display='none';
+                showToast('✅ تم إرسال صوتك!');
+            };
+            vBtns.appendChild(btn);
+        });
+    }
+}
+
+socket.on('voteResultUpdate', (d)=>{
+    let s='';
+    for(let k in d.details)
+        s+='<p style="text-align:right">'+k+': <b style="color:#d4af37">'+d.details[k]+'</b> أصوات</p>';
+    s+='<p style="color:#555;font-size:.8em;text-align:right">إجمالي: '+d.totalVotes+'</p>';
+    document.getElementById('vStats').innerHTML=s;
+});
+
+socket.on('nextRound', (data)=>{
+    if(!isBoss){
+        if(data.canVote && data.chars.length>0){
+            renderVoteButtons(data.chars, data.isGhost||false);
+        } else if(!data.canVote){
+            document.getElementById('vUI').style.display='none';
+        }
+    }
+});
+
+// ════════════════════════════════════════════════
+//  Panic Mode
+// ════════════════════════════════════════════════
+let panicInterval=null;
+
+function triggerPanic(){
+    socket.emit('triggerPanic', myCode);
+}
+
+socket.on('panicAction', ()=>{
+    const overlay=document.getElementById('panicOverlay');
+    const timerEl=document.getElementById('panicTimer');
+    document.getElementById('panicTwistText').textContent='';
+    overlay.classList.add('active');
+
+    // Web Audio beeps
+    try{
+        const ctx=new(window.AudioContext||window.webkitAudioContext)();
+        for(let i=0;i<10;i++){
+            const o=ctx.createOscillator(), g=ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value=i%2===0?880:660;
+            o.type='sawtooth';
+            g.gain.setValueAtTime(.25,ctx.currentTime+i);
+            g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+i+.6);
+            o.start(ctx.currentTime+i);
+            o.stop(ctx.currentTime+i+.65);
+        }
+    }catch(e){}
+
+    let t=10; timerEl.textContent=t;
+    clearInterval(panicInterval);
+    panicInterval=setInterval(()=>{
+        t--;
+        timerEl.textContent=t;
+        if(t<=0){ clearInterval(panicInterval); overlay.classList.remove('active'); }
+    },1000);
+});
+
+socket.on('panicTwist', (twist)=>{
+    const card=document.getElementById('twistCard');
+    const txt=document.getElementById('twistText');
+    card.style.display='block';
+    
+    const safeTwist = twist.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+    txt.innerHTML = '<span style="font-size:1.1em">'+twist+'</span><br><button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist(\''+safeTwist+'\')">إرسال التويست للاعبين 📢</button>';
+    showToast('🌀 Plot Twist تم توليده!', 3000);
+});
+
+function sharePlotTwist(twistText) {
+    socket.emit('shareTwist', { roomCode: myCode, twist: twistText });
+    document.getElementById('shareTwistBtn').disabled = true;
+    document.getElementById('shareTwistBtn').textContent = 'تم الإرسال ✔️';
+    showToast('✅ تم إرسال الحدث المفاجئ للاعبين!', 3000);
+}
+
+// ════════════════════════════════════════════════
+//  Execution Result
+// ════════════════════════════════════════════════
+function confirmExecution(){
+    if(confirm('هل أنت متأكد من تنفيذ الإعدام؟')){
+        socket.emit('executePlayer', myCode);
+    }
+}
+
+socket.on('executionResult', (d)=>{
+    const overlay=document.getElementById('resultOverlay');
+    document.getElementById('resultIcon').textContent=d.isMafia?'🎯':'😢';
+    document.getElementById('resultMsg').textContent=d.message;
+    overlay.classList.add('active');
+    if(d.gameOver) document.querySelector('#resultOverlay button').textContent='ممتاز!';
+});
+
+function closeResult(){
+    document.getElementById('resultOverlay').classList.remove('active');
+}
+
+// ════════════════════════════════════════════════
+//  Game Over
+// ════════════════════════════════════════════════
+socket.on('gameOver', (msg)=>{
+    SS.clear();
+    const overlay=document.getElementById('resultOverlay');
+    document.getElementById('resultIcon').textContent=msg.includes('انتصرت')?'🏆':'💀';
+    document.getElementById('resultMsg').innerHTML=msg+'<br><br><button onclick="location.reload()" style="width:auto;padding:10px 24px">العب تاني 🔄</button>';
+    document.querySelector('#resultOverlay button:first-of-type').style.display='none';
+    overlay.classList.add('active');
+});
+
+// ════════════════════════════════════════════════
+//  Close Room (Boss)
+// ════════════════════════════════════════════════
+function closeRoom(){
+    if(confirm('هل تريد إغلاق الغرفة؟ سيخرج كل اللاعبين.')){
+        socket.emit('closeRoom', myCode);
+        SS.clear();
+        location.reload();
+    }
+}
+
+function startVotingPhase() {
+    socket.emit('startVotingPhase', myCode);
+    document.getElementById('btnStartVote').disabled = true;
+    document.getElementById('btnStartVote').innerText = "جاري التصويت...";
+}
+
+socket.on('votingStarted', () => {
+    showToast('تم فتح باب التصويت للاعبين!', 3000);
+});
+
+socket.on('executionResult', () => {
+    const btn = document.getElementById('btnStartVote');
+    if(btn) {
+        btn.disabled = false;
+        btn.innerText = "بدء التصويت 🗳️";
+    }
+    document.getElementById('vStats').innerHTML = '<p style="color:#555">لا يوجد أصوات بعد</p>';
+});
+
+socket.on('phaseTimer', (d) => {
+    startTimer(d.seconds, d.label, () => {
+        if(d.phase === 'voting') {
+            showToast('⏰ انتهى وقت التصويت!');
+        }
+    });
+});
+
+socket.on('timerExpired', (d) => {
+    stopTimer();
+    if(d.autoExecute && isBoss) {
+        showToast('⏰ الوقت خلص! جاري تنفيذ الإعدام تلقائياً...');
+        setTimeout(() => confirmExecution(), 2000);
+    }
+});
+
+// ════════════════════════════════════════════════
+//  Auto-fill code from URL
+// ════════════════════════════════════════════════
+window.addEventListener('load', ()=>{
+    const code=new URLSearchParams(location.search).get('code');
+    if(code){
+        document.getElementById('roomCodeInput').value=code.toUpperCase();
+    }
+    // نشوف لو فيه session قديمة
+    const sess=SS.load();
+    if(!sess.code) {
+        show('screen-home');
+    } else if(!sess._connected) {
+        show('screen-home');
+    }
+    // لو فيه session هيتعالج في socket.on('connect')
+});
+
+// ════════════════════════════════════════════════
+//  Helpers
+// ════════════════════════════════════════════════
+function show(id){
+    document.querySelectorAll('.screen').forEach(s=>s.style.display='none');
+    const el=document.getElementById(id);
+    if(el) el.style.display='block';
+}
+
+function showToast(msg, dur=3000){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.style.display='block';
+    clearTimeout(t._t);
+    t._t=setTimeout(()=>{ t.style.display='none'; }, dur);
+}
+
+function selectGame(type) {
+    if (type === 'classic') {
+        window.location.href = '/mafia-classic.html';
+        return;
+    }
+    if (type === 'impostor') {
+        window.location.href = '/impostor.html';
+        return;
+    }
+    // mafioso
+    document.getElementById('game-select-view').style.display = 'none';
+    document.getElementById('mafioso-join-view').style.display = 'block';
+}
+
+function backToGameSelect() {
+    document.getElementById('game-select-view').style.display = 'block';
+    document.getElementById('mafioso-join-view').style.display = 'none';
+}
+
+async function shareRoom() {
+    const url = window.location.origin + '?code=' + myCode;
+    const text = 'انضم لجيم المافيا! كود الغرفة: '+myCode+'\n'+url;
+    
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: 'Mafioso Trial 🕵️', text: text, url: url });
+        } catch(e) {}
+    } else {
+        navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
+    }
+}
+</script>
+</body>
+</html>
