@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>المافيا الكلاسيك 🌙</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh;padding-bottom:80px}
+h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
+.card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
+button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s;touch-action:manipulation}
+button:active{transform:scale(.95)}
+button:disabled{opacity:.5;cursor:not-allowed}
+input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radius:8px;width:90%;margin:8px 0;font-size:16px}
+.screen{display:none}
+.player-tag{display:inline-block;background:#222;padding:8px 15px;border-radius:20px;margin:4px;font-size:14px;color:#00ffcc;border:1px solid #00ffcc}
+.player-tag.dead{color:#555;border-color:#333;text-decoration:line-through}
+.loader{border:4px solid #333;border-top:4px solid #d4af37;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+#conn-bar{position:fixed;top:0;left:0;right:0;padding:7px;font-size:13px;text-align:center;z-index:9999;display:none}
+#conn-bar.offline{background:#c0392b;display:block}
+#conn-bar.online{background:#27ae60;display:block;animation:fadeBar 2s 1.5s forwards}
+@keyframes fadeBar{to{opacity:0;pointer-events:none}}
+#resultOverlay{display:none;position:fixed;inset:0;z-index:8000;align-items:center;justify-content:center;flex-direction:column;padding:20px;background:rgba(0,0,0,.92)}
+#resultOverlay.active{display:flex}
+.result-box{background:#151515;border:2px solid #d4af37;border-radius:16px;padding:24px;max-width:440px;width:100%}
+.result-icon{font-size:3.5em;margin-bottom:8px}
+.result-msg{font-size:1em;line-height:1.7;margin-bottom:16px;color:#eee;white-space:pre-line;text-align:right}
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a1a;border:1px solid #d4af37;color:#fff;padding:10px 20px;border-radius:10px;z-index:9999;max-width:90%;font-size:14px;display:none;text-align:center}
+.sep{border:none;border-top:1px solid #2a2a2a;margin:10px 0}
+.label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right;display:block}
+.badge-mafia{color:#ff4d4d;font-weight:bold}
+.badge-civ{color:#00ffcc;font-weight:bold}
+.badge-doc{color:#a78bfa;font-weight:bold}
+.btn-danger{background:#dc3545!important;color:#fff!important}
+.btn-green{background:#28a745!important;color:#fff!important}
+.btn-blue{background:#17a2b8!important;color:#fff!important}
+.btn-purple{background:#6f42c1!important;color:#fff!important}
+.btn-gray{background:#444!important;color:#fff!important}
+.btn-orange{background:#e67e22!important;color:#fff!important}
+.btn-sm{width:auto!important;padding:8px 14px!important;font-size:14px!important}
+#qrcode{margin:10px auto;display:flex;justify-content:center}
+#qrcode img,#qrcode canvas{border-radius:8px;border:3px solid #d4af37;background:#fff;padding:6px}
+
+/* Phase Banner - Enhanced */
+.phase-banner{background:#1a0a2e;border:2px solid #6f42c1;border-radius:10px;padding:12px;margin:8px 0;font-size:1em;font-weight:bold;color:#c9b1ff;text-align:center}
+.phase-banner.night_mafia{background:#2a0a0a;border-color:#ff4d4d;color:#ff9999}
+.phase-banner.night_doctor{background:#0a0a2e;border-color:#a78bfa;color:#c9b1ff}
+.phase-banner.discussion{background:#1a2a0a;border-color:#28a745;color:#7fff7f}
+.phase-banner.voting{background:#1a1a0a;border-color:#d4af37;color:#ffe699}
+.vote-btn{background:#222;border:2px solid #555;color:#fff;border-radius:8px;padding:10px 16px;cursor:pointer;font-size:15px;width:auto;transition:.2s;margin:4px;touch-action:manipulation}
+.vote-btn:hover{border-color:#d4af37}
+.vote-btn.selected{border-color:#ff4d4d;background:#2a0000;color:#ff6b6b}
+
+/* Role Reveal */
+.role-card{position:relative;background:#111;border-radius:12px;padding:16px;margin:10px 0;cursor:pointer;user-select:none;transition:.3s;overflow:hidden;border:2px dashed #333}
+.role-card:hover{border-color:#555}
+.role-card.hidden .role-real{filter:blur(8px);opacity:.3;transition:.3s}
+.role-card.hidden::after{content:'👁️ اضغط لكشف دورك';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1em;color:#888;background:rgba(0,0,0,.4);border-radius:10px}
+.role-card.revealed .role-real{filter:none;opacity:1;transition:.3s}
+.role-real{font-size:1.8em;font-weight:bold;padding:8px 0;transition:.3s}
+
+/* Chat */
+#chatBox{position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(10,10,10,.97);border-top:2px solid #d4af37;transition:.3s;max-height:55vh;display:flex;flex-direction:column}
+#chatBox.collapsed{max-height:44px}
+#chatHeader{padding:8px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#111;flex-shrink:0}
+#chatMessages{flex:1;overflow-y:auto;padding:8px 12px;font-size:.85em;text-align:right;min-height:80px}
+.chat-msg{margin:4px 0;padding:5px 10px;border-radius:8px;background:#1a1a1a;border-right:3px solid #444;text-align:right}
+.chat-msg .chat-from{color:#d4af37;font-size:.8em;font-weight:bold}
+.chat-msg .chat-time{color:#555;font-size:.7em;margin-right:6px}
+#chatInputRow{display:flex;gap:6px;padding:8px;flex-shrink:0}
+#chatInput{flex:1;background:#222;color:#fff;border:1px solid #444;padding:8px 12px;border-radius:8px;font-size:14px}
+#chatSendBtn{background:#d4af37;color:#000;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;width:auto}
+
+/* Lobby List */
+.lobby-room-card{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.2s}
+.lobby-room-card:hover{border-color:#d4af37}
+.join-req{background:#1a1a2e;border:1px solid #4444ff;border-radius:8px;padding:8px 12px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;font-size:.9em}
+
+/* ── Timer ── */
+.timer-container{position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#1a0a0a;border:2px solid #d4af37;border-radius:12px;padding:10px 20px;z-index:1000;display:none;box-shadow:0 4px 20px rgba(212,175,55,0.3)}
+.timer-container.active{display:block;animation:pulseTimer 1s infinite}
+@keyframes pulseTimer{0%,100%{box-shadow:0 4px 20px rgba(212,175,55,0.3)}50%{box-shadow:0 4px 30px rgba(212,175,55,0.6)}}
+.timer-bar{width:200px;height:6px;background:#333;border-radius:3px;overflow:hidden;margin-top:8px}
+.timer-fill{height:100%;background:linear-gradient(90deg,#d4af37,#ff6b35);border-radius:3px;transition:width 1s linear}
+.timer-text{color:#d4af37;font-weight:bold;font-size:1.2em;display:flex;justify-content:space-between;align-items:center}
+.timer-label{font-size:0.7em;color:#888;text-transform:uppercase;letter-spacing:1px}
+.timer-urgent{color:#ff4d4d!important;animation:blink 0.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.5}}
+
+/* ── Action Section for Players ── */
+.action-title{color:#d4af37;font-size:1.1em;margin-bottom:12px;text-align:center}
+.action-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.action-btn{background:#222;border:2px solid #444;color:#fff;border-radius:10px;padding:14px 18px;cursor:pointer;font-size:16px;transition:.2s;min-width:100px;touch-action:manipulation}
+.action-btn:hover{border-color:#d4af37;background:#2a2a2a}
+.action-btn.selected{background:#0a2a0a;border-color:#28a745;color:#7fff7f}
+.action-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Phase Info Card ── */
+.phase-info{background:#0a0a1a;border:1px solid #444;border-radius:10px;padding:12px;margin:10px 0;text-align:center}
+.phase-info-title{color:#888;font-size:.85em;margin-bottom:6px}
+.phase-info-text{color:#fff;font-size:1em}
+
+/* ── Mobile Optimizations ── */
+@media (max-width:480px){
+    body{padding:8px;padding-bottom:100px!important}
+    h1{font-size:1.5em;margin:15px 0 8px}
+    .card{padding:18px;margin:12px auto;border-width:2px;border-radius:14px;max-width:100%}
+    button{padding:16px;font-size:18px;margin:6px;width:95%;border-radius:10px;min-height:52px}
+    button:active{transform:scale(.97)}
+    input{padding:16px;font-size:18px;margin:10px 0;border-radius:10px;min-height:52px}
+    .player-tag{padding:10px 18px;font-size:16px;margin:6px;border-radius:24px}
+    .player-tag.dead{font-size:14px}
+    .label{font-size:.9em}
+    #toast{bottom:100px;padding:14px 24px;font-size:16px;width:95%}
+    .btn-sm{padding:12px 20px!important;font-size:16px!important;min-height:44px}
+    .result-box{padding:20px;margin:10px}
+    .result-icon{font-size:3em}
+    .result-msg{font-size:1em}
+    .phase-banner{padding:14px;font-size:1.05em}
+    .role-card{padding:20px}
+    .role-real{font-size:2em}
+    .role-card.hidden::after{font-size:1.1em}
+    #chatBox{max-height:60vh}
+    #chatHeader{padding:12px 16px}
+    #chatMessages{padding:10px 14px;font-size:.9em}
+    #chatInput{padding:12px;font-size:16px}
+    #chatSendBtn{padding:12px 18px}
+    .lobby-room-card{padding:14px;margin:8px 0}
+    .vote-btn{padding:12px 18px;font-size:16px;margin:6px}
+    .timer-container{padding:12px 24px}
+    .timer-bar{width:240px;height:8px}
+    .timer-text{font-size:1.3em}
+    .action-btn{padding:16px 20px;font-size:17px;min-width:120px}
+}
+
+@media (max-width:360px){
+    button{padding:14px;font-size:17px;min-height:48px}
+    input{padding:14px;font-size:17px;min-height:48px}
+    .card{padding:16px}
+    h1{font-size:1.3em}
+    .role-real{font-size:1.7em}
+    .timer-bar{width:200px}
+    .vote-btn{padding:10px 14px;font-size:15px}
+    .action-btn{padding:14px 16px;font-size:16px}
+}
+
+@media (min-width:481px) and (max-width:768px){
+    .card{max-width:460px}
+    button{width:92%}
+}
+</style>
+</head>
+<body>
+<div id="conn-bar"></div>
+<div id="toast"></div>
+
+<!-- Timer Component -->
+<div id="timerContainer" class="timer-container">
+    <div class="timer-text">
+        <span id="timerLabel">الوقت</span>
+        <span id="timerValue">30</span>
+    </div>
+    <div class="timer-bar">
+        <div id="timerFill" class="timer-fill" style="width:100%"></div>
+    </div>
+</div>
+
+<div id="resultOverlay">
+  <div class="result-box">
+    <div class="result-icon" id="resultIcon">⚖️</div>
+    <div class="result-msg" id="resultMsg"></div>
+    <div id="resultBtns" style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px"></div>
+  </div>
+</div>
+
+<!-- ══ HOME ══ -->
+<div id="screen-home" class="screen">
+  <h1>🌙 المافيا الكلاسيك</h1>
+  <div id="lobbyListSection" class="card">
+    <h3 style="color:#d4af37;margin-bottom:8px">🏠 الغرف المفتوحة</h3>
+    <div id="lobbyListEl"><p style="color:#555;font-size:.9em">جاري التحميل...</p></div>
+    <button class="btn-gray btn-sm" onclick="refreshLobby()">🔄 تحديث</button>
+  </div>
+  <div class="card">
+    <button class="btn-green" onclick="showCreateOptions()">إنشاء غرفة — أنا البوس 👑</button>
+    <div id="createOptions" style="display:none;margin-top:10px">
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;color:#aaa;font-size:.9em;margin-bottom:10px">
+        <input type="checkbox" id="isPrivate" style="width:auto;margin:0"> غرفة خاصة (مخفية)
+      </label>
+      <button class="btn-green" onclick="createRoom()">إنشاء ✅</button>
+    </div>
+    <hr class="sep">
+    <input type="text" id="playerName" placeholder="اكتب اسمك">
+    <input type="text" id="roomCodeInput" placeholder="كود الغرفة" style="letter-spacing:6px;text-transform:uppercase;text-align:center;font-size:20px" oninput="this.value=this.value.toUpperCase()">
+    <button class="btn-gray" onclick="joinRoom()">انضمام كلاعب 👤</button>
+  </div>
+  <div style="margin-top:10px"><a href="/" style="color:#888;font-size:.85em">← رجوع</a></div>
+</div>
+
+<!-- ══ WAITING ══ -->
+<div id="screen-wait" class="screen">
+  <div class="card" style="margin-top:40px">
+    <div class="loader"></div>
+    <h2 style="color:#d4af37;margin:10px 0">تم الانضمام ✅</h2>
+    <p id="wait-name" style="color:#00ffcc;font-weight:bold;font-size:1.1em"></p>
+    <p style="color:#888;margin-top:8px">انتظر البوس يبدأ الجيم...</p>
+    <button class="btn-gray btn-sm" style="margin-top:15px" onclick="leaveRoom()">مغادرة الغرفة 🚪</button>
+  </div>
+</div>
+
+<!-- ══ WAITING APPROVAL ══ -->
+<div id="screen-wait-approval" class="screen">
+  <div class="card" style="margin-top:40px">
+    <div class="loader"></div>
+    <h2 style="color:#d4af37;margin:10px 0">طلب الانضمام 📨</h2>
+    <p style="color:#aaa">تم إرسال طلبك للبوس، انتظر الموافقة...</p>
+  </div>
+</div>
+
+<!-- ══ BOSS LOBBY ══ -->
+<div id="screen-boss-lobby" class="screen">
+  <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
+  <div class="card">
+    <div id="qrcode"></div>
+    <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:8px">
+      <button class="btn-blue btn-sm" onclick="shareQRImage()">مشاركة QR 📷</button>
+      <button class="btn-blue btn-sm" onclick="shareLink()">مشاركة رابط 🔗</button>
+    </div>
+  </div>
+  <div class="card">
+    <span class="label">اللاعبون:</span>
+    <div id="pList" style="margin:8px 0">انتظار...</div>
+    <p id="pCount" style="color:#888;font-size:.85em"></p>
+    <div id="joinRequests"></div>
+    <hr class="sep">
+    <button id="startBtn" class="btn-green" onclick="startGame()" style="display:none">ابدأ الليلة 🌙</button>
+    <button class="btn-danger btn-sm" onclick="closeRoom()">إغلاق الغرفة ❌</button>
+  </div>
+</div>
+
+<!-- ══ BOSS GAME ══ -->
+<div id="screen-boss-game" class="screen">
+  <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
+  <div class="card">
+    <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار الحقيقية</h4>
+    <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:2"></div>
+  </div>
+  <div class="card">
+    <div class="phase-banner" id="bossPhaseBanner">🌙 الليل</div>
+    <div id="bossTimerSection" style="display:none;margin:10px 0">
+      <div class="phase-info">
+        <div class="phase-info-title">⏱️ الوقت المتبقي للمرحلة</div>
+        <div class="phase-info-text" id="bossTimerDisplay">30 ثانية</div>
+      </div>
+    </div>
+    <div id="nightMafiaSection">
+      <h4 style="color:#ff4d4d;margin:8px 0">قرار المافيا:</h4>
+      <div id="mafiaVoteResult" style="color:#aaa;min-height:28px">انتظار...</div>
+    </div>
+    <div id="nightDoctorSection">
+      <hr class="sep">
+      <h4 style="color:#a78bfa;margin:8px 0">قرار الدكتور:</h4>
+      <div id="doctorSaveResult" style="color:#aaa;min-height:28px">انتظار...</div>
+    </div>
+    <div id="dayVoteSection" style="display:none">
+      <hr class="sep">
+      <h4 style="margin:8px 0">📊 التصويت:</h4>
+      <div id="vStats" style="text-align:right;min-height:36px"><p style="color:#555">لا يوجد بعد</p></div>
+    </div>
+    <hr class="sep">
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+      <button class="btn-purple btn-sm" id="btnRevealNight" onclick="revealNightResult()" style="display:none">كشف نتيجة الليل 🌅</button>
+      <button class="btn-green btn-sm" id="btnStartVote" onclick="startVotingPhase()" style="display:none">بدء التصويت 🗳️</button>
+      <button class="btn-danger btn-sm" id="btnExecute" onclick="confirmExecution()" style="display:none">تنفيذ الإعدام 💀</button>
+      <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء ❌</button>
+    </div>
+  </div>
+  <div class="card">
+    <h4 style="color:#aaa;margin-bottom:6px">اللاعبون:</h4>
+    <div id="bossAliveList"></div>
+    <div id="joinRequestsGame"></div>
+  </div>
+</div>
+
+<!-- ══ PLAYER GAME ══ -->
+<div id="screen-player-game" class="screen">
+  <div class="card">
+    <p style="color:#888;margin-bottom:10px">دورك (اضغط لكشفه):</p>
+    <div class="role-card hidden" id="roleCard" onclick="toggleRole()">
+      <div class="role-real" id="roleDisplay">⬛⬛⬛⬛</div>
+    </div>
+    <p id="roleDesc" style="color:#aaa;font-size:.85em;margin-top:10px"></p>
+  </div>
+  
+  <div id="phaseInfoCard" class="card" style="display:none">
+    <div class="phase-info">
+      <div class="phase-info-title">المرحلة الحالية</div>
+      <div class="phase-info-text" id="currentPhaseDisplay">...</div>
+    </div>
+    <div class="phase-info" id="actionInfo" style="display:none;margin-top:8px">
+      <div class="phase-info-title">مطلوب منك</div>
+      <div class="phase-info-text" id="actionRequired">...</div>
+    </div>
+  </div>
+  
+  <div id="actionSection" style="display:none" class="card">
+    <h3 id="actionTitle" class="action-title"></h3>
+    <div id="actionBtns" class="action-buttons"></div>
+  </div>
+  
+  <div id="ghostNotice" style="display:none" class="card">
+    <p style="color:#888">👻 أنت خرجت من اللعبة — شاهد فقط</p>
+    <button class="btn-gray btn-sm" style="margin-top:8px" onclick="leaveRoom()">مغادرة 🚪</button>
+  </div>
+</div>
+
+<!-- ══ CHAT ══ -->
+<div id="chatBox" class="collapsed">
+  <div id="chatHeader" onclick="toggleChat()">
+    <span style="color:#d4af37;font-weight:bold">💬 الدردشة <span id="chatUnread" style="background:#ff4d4d;color:#fff;border-radius:50%;padding:1px 6px;font-size:.75em;display:none">0</span></span>
+    <span id="chatChevron" style="color:#888">▲</span>
+  </div>
+  <div id="chatMessages"></div>
+  <div id="chatInputRow">
+    <input id="chatInput" placeholder="اكتب رسالة..." onkeydown="if(event.key==='Enter')sendChat()">
+    <button id="chatSendBtn" onclick="sendChat()">إرسال</button>
+  </div>
+</div>
+
+<canvas id="qrExportCanvas" style="display:none"></canvas>
+
+<script>
+// Timer Manager
+const TimerManager = {
+    container: null, label: null, value: null, fill: null,
+    interval: null, endTime: 0, duration: 0,
+    init() {
+        this.container = document.getElementById('timerContainer');
+        this.label = document.getElementById('timerLabel');
+        this.value = document.getElementById('timerValue');
+        this.fill = document.getElementById('timerFill');
+    },
+    start(seconds, labelText) {
+        if (!this.container) this.init();
+        this.duration = seconds;
+        this.endTime = Date.now() + seconds * 1000;
+        this.label.textContent = labelText || 'الوقت';
+        this.container.classList.add('active');
+        this.update();
+        this.interval = setInterval(() => this.update(), 100);
+    },
+    update() {
+        const remaining = Math.max(0, Math.ceil((this.endTime - Date.now()) / 1000));
+        this.value.textContent = remaining;
+        const pct = (remaining / this.duration) * 100;
+        this.fill.style.width = pct + '%';
+        if (remaining <= 5) {
+            this.value.classList.add('timer-urgent');
+            this.fill.style.background = 'linear-gradient(90deg,#ff4d4d,#ff0000)';
+        } else {
+            this.value.classList.remove('timer-urgent');
+            this.fill.style.background = 'linear-gradient(90deg,#d4af37,#ff6b35)';
+        }
+        if (remaining === 0) this.hide();
+    },
+    hide() {
+        clearInterval(this.interval);
+        this.container?.classList.remove('active');
+    }
+};
+
+// Phase Display Helper
+const PhaseDisplay = {
+    update(phase) {
+        const card = document.getElementById('phaseInfoCard');
+        const display = document.getElementById('currentPhaseDisplay');
+        const actionInfo = document.getElementById('actionInfo');
+        const actionRequired = document.getElementById('actionRequired');
+        
+        if (!card || !display) return;
+        
+        const phases = {
+            night_mafia: {text: '🌙 ليل المافيا', action: 'المافيا تختار ضحية'},
+            night_doctor: {text: '🏥 ليل الدكتور', action: 'الدكتور يختار من ينقذه'},
+            discussion: {text: '☀️ وقت النقاش', action: 'ناقشوا من المافيا'},
+            voting: {text: '🗳️ وقت التصويت', action: 'صوتوا لطرد المشتبه'},
+            finished: {text: '🏁 انتهت اللعبة', action: null}
+        };
+        
+        const p = phases[phase] || {text: '...', action: null};
+        display.textContent = p.text;
+        
+        if (p.action) {
+            actionInfo.style.display = 'block';
+            actionRequired.textContent = p.action;
+        } else {
+            actionInfo.style.display = 'none';
+        }
+        
+        card.style.display = 'block';
+    },
+    hide() {
+        const card = document.getElementById('phaseInfoCard');
+        if (card) card.style.display = 'none';
+    }
+};
+
+// Role Toggle
+function toggleRole() {
+    const card = document.getElementById('roleCard');
+    const display = document.getElementById('roleDisplay');
+    if (!card || !display) return;
+    
+    const current = display.textContent;
+    if (current === '⬛⬛⬛⬛') {
+        display.textContent = card.dataset.role || 'مواطن';
+        card.classList.remove('hidden');
+        card.classList.add('revealed');
+    } else {
+        display.textContent = '⬛⬛⬛⬛';
+        card.classList.remove('revealed');
+        card.classList.add('hidden');
+    }
+}
+
+// Placeholder functions
+function refreshLobby() { showToast('جاري التحديث...', 2000); }
+function showCreateOptions() { document.getElementById('createOptions').style.display = 'block'; }
+function createRoom() { showToast('إنشاء غرفة...', 2000); }
+function joinRoom() { showToast('انضمام للغرفة...', 2000); }
+function leaveRoom() { showToast('مغادرة...', 2000); }
+function closeRoom() { showToast('إغلاق...', 2000); }
+function startGame() { showToast('بدء اللعبة...', 2000); }
+function startVotingPhase() { showToast('بدء التصويت...', 2000); }
+function revealNightResult() { showToast('كشف نتيجة الليل...', 2000); }
+function confirmExecution() { showToast('تنفيذ الإعدام...', 2000); }
+function shareQRImage() { showToast('مشاركة QR...', 2000); }
+function shareLink() { showToast('نسخ الرابط...', 2000); }
+function toggleChat() { 
+    const box = document.getElementById('chatBox');
+    box.classList.toggle('collapsed');
+    document.getElementById('chatChevron').textContent = box.classList.contains('collapsed') ? '▲' : '▼';
+}
+function sendChat() { 
+    const input = document.getElementById('chatInput');
+    if (input?.value) {
+        showToast('إرسال رسالة...', 1000);
+        input.value = '';
+    }
+}
+
+function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'block';
+}
+
+function showToast(msg, duration=3000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', duration);
+}
+
+// Initialize on load
+window.addEventListener('load', () => {
+    show('screen-home');
+    TimerManager.init();
+});
+</script>
+</body>
+</html>

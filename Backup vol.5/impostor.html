@@ -506,17 +506,56 @@ socket.on('impResult',(d)=>{
     d.spies
   );
   SS.clear();
-  let html=`<b style="font-size:1.1em">${d.title}</b>\n\n`;
-  html+=`<span style="color:#ff6b35">🕵️ الجواسيس: </span><b>${d.spies.join(' و ')}</b>\n`;
-  html+=`<span style="color:#888">🔑 الكلمة: </span><b style="color:#00ffcc">${d.word}</b>\n`;
-  if(d.spyGuess){
-    const g=d.guessResult==='صحيح'?'✅ صح!':d.guessResult==='قريب'?'🟡 قريب!':'❌ غلط';
-    html+=`🎯 تخمين الجاسوس: "${d.spyGuess}" — ${g}`;
-    if(d.guessReason) html+=`\n(${d.guessReason})`;
+  document.getElementById('resultIcon').textContent = d.icon;
+  
+  const msgEl = document.getElementById('resultMsg');
+  msgEl.innerHTML = '';
+
+  // العنوان
+  const titleEl = document.createElement('b');
+  titleEl.style.fontSize = '1.1em';
+  titleEl.style.display = 'block';
+  titleEl.style.marginBottom = '12px';
+  titleEl.textContent = d.title;
+  msgEl.appendChild(titleEl);
+
+  // الجواسيس
+  const spyRow = document.createElement('p');
+  spyRow.style.marginBottom = '6px';
+  spyRow.innerHTML = `<span style="color:#ff6b35">🕵️ الجواسيس: </span><b>${d.spies.join(' و ')}</b>`;
+  msgEl.appendChild(spyRow);
+
+  // الكلمة
+  const wordRow = document.createElement('p');
+  wordRow.style.marginBottom = '10px';
+  wordRow.innerHTML = `<span style="color:#888">🔑 الكلمة: </span><b style="color:#00ffcc">${d.word}</b>`;
+  msgEl.appendChild(wordRow);
+
+  // تخمين الجاسوس
+  if (d.spyGuess) {
+    const gIcon = d.guessResult === 'صحيح' ? '✅' : d.guessResult === 'قريب' ? '🟡' : '❌';
+    const gColor = d.guessResult === 'صحيح' ? '#28a745' : d.guessResult === 'قريب' ? '#ffc107' : '#dc3545';
+    const guessRow = document.createElement('p');
+    guessRow.style.marginBottom = '6px';
+    guessRow.innerHTML = `🎯 تخمين الجاسوس: "<b>${d.spyGuess}</b>" — <span style="color:${gColor}">${gIcon} ${d.guessResult}</span>`;
+    msgEl.appendChild(guessRow);
+    if (d.guessReason) {
+      const reasonEl = document.createElement('p');
+      reasonEl.style.color = '#888';
+      reasonEl.style.fontSize = '.85em';
+      reasonEl.style.marginBottom = '10px';
+      reasonEl.textContent = d.guessReason;
+      msgEl.appendChild(reasonEl);
+    }
   }
-  html+=`\n\n${d.winnerText}`;
-  document.getElementById('resultIcon').textContent=d.icon;
-  document.getElementById('resultMsg').textContent=html;
+
+  // النتيجة النهائية
+  const winEl = document.createElement('p');
+  winEl.style.fontSize = '1.1em';
+  winEl.style.color = '#d4af37';
+  winEl.style.marginTop = '10px';
+  winEl.textContent = d.winnerText;
+  msgEl.appendChild(winEl);
   const btns=document.getElementById('resultBtns');btns.innerHTML='';
   if(isBoss){
     const rb=document.createElement('button');rb.textContent='🔄 نفس الغرفة';rb.style.width='auto';rb.style.padding='10px 16px';

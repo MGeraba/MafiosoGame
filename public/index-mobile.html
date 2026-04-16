@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mafioso Trial 🕵️</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+        body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh}
+        h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
+        .card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
+        button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s;touch-action:manipulation}
+        button:active{transform:scale(.95);background:#ffdf00}
+        input,textarea{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radius:8px;width:90%;margin:8px 0;font-size:16px;box-sizing:border-box}
+        textarea{height:80px;resize:vertical}
+        .screen{display:none}
+        .player-tag{display:inline-block;background:#222;padding:8px 15px;border-radius:20px;margin:5px;font-size:14px;color:#00ffcc;border:1px solid #00ffcc}
+        .loader{border:4px solid #333;border-top:4px solid #d4af37;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
+        /* ── Connection Bar ── */
+        #conn-bar{position:fixed;top:0;left:0;right:0;padding:7px;font-size:13px;text-align:center;z-index:9999;display:none;transition:.3s}
+        #conn-bar.offline{background:#c0392b;display:block}
+        #conn-bar.online{background:#27ae60;display:block;animation:fadeBar 2s 1.5s forwards}
+        @keyframes fadeBar{to{opacity:0;pointer-events:none}}
+
+        /* ── Panic Overlay ── */
+        #panicOverlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(160,0,0,.95);flex-direction:column;align-items:center;justify-content:center;animation:flashRed .5s infinite alternate}
+        #panicOverlay.active{display:flex}
+        @keyframes flashRed{from{background:rgba(160,0,0,.95)}to{background:rgba(255,20,20,.98)}}
+        .panic-title{font-size:2.2em;font-weight:bold;letter-spacing:4px;color:#fff;text-shadow:0 0 20px #f00}
+        .panic-timer{font-size:5em;font-weight:bold;color:#fff;margin:10px 0;text-shadow:0 0 30px #ff0}
+        #panicTwistText{font-size:1em;color:#ffe;max-width:400px;line-height:1.6;margin-top:10px;padding:0 20px;font-style:italic}
+
+        /* ── Clues Panel ── */
+        #clues-panel{text-align:right}
+        .clue-item{background:#0d1f0d;border:1px solid #2d6a2d;border-radius:8px;padding:10px 14px;margin:6px 0}
+        .clue-meta{font-size:.75em;color:#666;margin-bottom:4px}
+        .clue-text{color:#7fff7f;line-height:1.5;font-size:.95em}
+
+        /* ── QR Code ── */
+        #qrcode{margin:10px auto;display:flex;justify-content:center}
+        #qrcode img,#qrcode canvas{border-radius:8px;border:3px solid #d4af37;background:#fff;padding:6px}
+
+        /* ── Story Box ── */
+        .story-box{background:#0a1520;border:1px solid #1a4a7a;border-radius:8px;padding:12px 16px;text-align:right;line-height:1.7;font-size:1em;color:#b0d4f1;margin:10px 0}
+
+        /* ── Result Message ── */
+        #resultOverlay{display:none;position:fixed;inset:0;z-index:8000;align-items:center;justify-content:center;flex-direction:column;padding:20px;background:rgba(0,0,0,.88)}
+        #resultOverlay.active{display:flex}
+        .result-box{background:#151515;border:2px solid #d4af37;border-radius:16px;padding:28px;max-width:420px;width:100%}
+        .result-icon{font-size:4em;margin-bottom:10px}
+        .result-msg{font-size:1.1em;line-height:1.7;margin-bottom:20px;color:#eee}
+
+        /* ── Toast ── */
+        #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;border:1px solid #d4af37;color:#fff;padding:12px 22px;border-radius:10px;z-index:9999;max-width:90%;font-size:14px;display:none;text-align:center}
+
+        /* ── Ghost Badge ── */
+        .ghost-badge{background:#333;color:#888;border:1px solid #555;border-radius:20px;padding:4px 12px;font-size:.85em;margin:8px auto;display:inline-block}
+
+        /* ── Misc ── */
+        .sep{border:none;border-top:1px solid #2a2a2a;margin:12px 0}
+        .label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right;display:block}
+        .badge-mafia{color:#ff4d4d;font-size:1.3em;font-weight:bold}
+        .badge-civ{color:#00ffcc;font-size:1.3em;font-weight:bold}
+        .btn-danger{background:#dc3545!important;color:#fff!important}
+        .btn-green{background:#28a745!important;color:#fff!important}
+        .btn-blue{background:#17a2b8!important;color:#fff!important}
+        .btn-gray{background:#444!important;color:#fff!important}
+        .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
+
+        body { padding-bottom: 100px !important; }
+
+        /* ── Ghost Chat ── */
+        .ghost-chat {position:fixed;bottom:100px;right:10px;width:280px;max-height:300px;background:#0a0a0a;border:1px solid #555;border-radius:12px;display:none;flex-direction:column;z-index:100}
+        .ghost-chat.active {display:flex}
+        .ghost-chat-header {background:#1a1a1a;padding:10px;border-radius:12px 12px 0 0;color:#888;font-size:0.85em;display:flex;justify-content:space-between;align-items:center}
+        .ghost-chat-messages {flex:1;overflow-y:auto;padding:10px;max-height:200px}
+        .ghost-chat-input {display:flex;padding:10px;border-top:1px solid #333}
+        .ghost-chat-input input {flex:1;margin:0;margin-left:8px}
+        .ghost-msg {margin:4px 0;padding:6px 10px;background:#1a1a1a;border-radius:8px;font-size:0.9em}
+        .ghost-msg-name {color:#d4af37;font-size:0.8em;margin-bottom:2px}
+        .ghost-msg-text {color:#aaa}
+
+        /* ── Role Toggle ── */
+        .role-hidden {color:transparent!important;background-color:#333!important;text-shadow:0 0 12px rgba(255,255,255,0.7);border-color:#555!important;cursor:pointer;user-select:none;transition:all 0.3s ease}
+        .role-visible {cursor:pointer;user-select:none;transition:all 0.3s ease}
+        .role-container {display:inline-flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;background:#1a1a1a;padding:10px 20px;border-radius:10px;border:1px dashed #555}
+
+        /* ── Timer ── */
+        .timer-container {position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#1a0a0a;border:2px solid #d4af37;border-radius:12px;padding:10px 20px;z-index:1000;display:none;box-shadow:0 4px 20px rgba(212,175,55,0.3)}
+        .timer-container.active {display:block;animation:pulseTimer 1s infinite}
+        @keyframes pulseTimer {0%,100%{box-shadow:0 4px 20px rgba(212,175,55,0.3)}50%{box-shadow:0 4px 30px rgba(212,175,55,0.6)}}
+        .timer-bar {width:200px;height:6px;background:#333;border-radius:3px;overflow:hidden;margin-top:8px}
+        .timer-fill {height:100%;background:linear-gradient(90deg,#d4af37,#ff6b35);border-radius:3px;transition:width 1s linear}
+        .timer-text {color:#d4af37;font-weight:bold;font-size:1.2em;display:flex;justify-content:space-between;align-items:center}
+        .timer-label {font-size:0.7em;color:#888;text-transform:uppercase;letter-spacing:1px}
+        .timer-urgent {color:#ff4d4d!important;animation:blink 0.5s infinite}
+        @keyframes blink {0%,100%{opacity:1}50%{opacity:0.5}}
+
+        /* ── MIC FLOAT BUTTON ── */
+        #micFloat {position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:600;width:70px;height:70px;border-radius:50%;background:#444;border:3px solid #666;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.3s;box-shadow:0 4px 15px rgba(0,0,0,.5)}
+        #micFloat:hover {transform:translateX(-50%) scale(1.05)}
+        #micFloat.active {background:#28a745;border-color:#4ade80;animation:micPulse 2s infinite}
+        #micFloat.muted {background:#dc3545;border-color:#f87171}
+        #micFloat.off {background:#444;border-color:#666}
+        @keyframes micPulse {0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,0.4)}50%{box-shadow:0 0 0 15px rgba(74,222,128,0)}}
+        #micIcon {font-size:28px}
+        #micStatus {position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:#888;white-space:nowrap}
+
+        /* ── Voice Peers ── */
+        #voicePeers {position:fixed;bottom:170px;left:50%;transform:translateX(-50%);display:none;gap:8px;z-index:599;flex-wrap:wrap;justify-content:center;max-width:90%}
+        #voicePeers.active {display:flex}
+        .voice-peer {background:#1a2a1a;border:1px solid #4ade80;border-radius:20px;padding:6px 12px;font-size:12px;color:#4ade80;display:flex;align-items:center;gap:6px}
+        .voice-peer.speaking {animation:peerPulse 1s infinite;background:#0a3a0a}
+        @keyframes peerPulse {0%,100%{opacity:1}50%{opacity:.7}}
+        .peer-mic {font-size:10px}
+
+        /* ── Phase Badge ── */
+        #phaseDisplay {position:fixed;bottom:170px;left:50%;transform:translateX(-50%);background:#1a0a2a;border:1px solid #a855f7;border-radius:8px;padding:4px 12px;font-size:11px;color:#c084fc;z-index:598;display:none;white-space:nowrap}
+        #phaseDisplay.active {display:block}
+
+        /* ── Mobile Optimizations ── */
+        @media (max-width:480px){
+            body{padding:8px;padding-bottom:120px!important}
+            h1{font-size:1.5em;margin:15px 0 8px}
+            .card{padding:18px;margin:12px auto;border-width:2px;border-radius:14px;max-width:100%}
+            button{padding:16px;font-size:18px;margin:6px;width:95%;border-radius:10px;min-height:52px}
+            button:active{transform:scale(.97)}
+            input,textarea{padding:16px;font-size:18px;margin:10px 0;border-radius:10px;min-height:52px}
+            .player-tag{padding:10px 18px;font-size:16px;margin:6px;border-radius:24px}
+            .label{font-size:.9em}
+            #toast{bottom:100px;padding:14px 24px;font-size:16px;width:95%}
+            .btn-sm{padding:12px 20px!important;font-size:16px!important;min-height:44px}
+            .result-box{padding:24px;margin:10px}
+            .result-icon{font-size:3.5em}
+            .result-msg{font-size:1em}
+            .panic-title{font-size:1.8em}
+            .panic-timer{font-size:4em}
+            .story-box{padding:14px;font-size:1.05em}
+            #micFloat{width:65px;height:65px}
+            #micIcon{font-size:24px}
+            #voicePeers{bottom:160px}
+            .voice-peer{padding:8px 14px;font-size:13px}
+        }
+
+        @media (max-width:360px){
+            button{padding:14px;font-size:17px;min-height:48px}
+            input,textarea{padding:14px;font-size:17px;min-height:48px}
+            .card{padding:16px}
+            h1{font-size:1.3em}
+        }
+
+        @media (min-width:481px) and (max-width:768px){
+            .card{max-width:460px}
+            button{width:92%}
+        }
+    </style>
+</head>
+<body>
+
+<!-- Ghost Chat -->
+<div id="ghostChat" class="ghost-chat">
+    <div class="ghost-chat-header">
+        <span>👻 شات الأشباح</span>
+        <button onclick="toggleGhostChat()" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2em">×</button>
+    </div>
+    <div id="ghostChatMessages" class="ghost-chat-messages"></div>
+    <div class="ghost-chat-input">
+        <input type="text" id="ghostChatInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendGhostMessage()">
+        <button onclick="sendGhostMessage()" class="btn-sm" style="width:auto">📤</button>
+    </div>
+</div>
+
+<!-- Panic Overlay -->
+<div id="panicOverlay">
+    <div class="panic-title">🚨 PANIC MODE 🚨</div>
+    <div class="panic-timer" id="panicTimer">10</div>
+    <div id="panicTwistText"></div>
+</div>
+
+<!-- Execution Result Overlay -->
+<div id="resultOverlay">
+    <div class="result-box">
+        <div class="result-icon" id="resultIcon">⚖️</div>
+        <div class="result-msg" id="resultMsg"></div>
+        <button onclick="closeResult()">حسناً</button>
+    </div>
+</div>
+
+<!-- Connection Bar -->
+<div id="conn-bar"></div>
+
+<!-- Voice Peers -->
+<div id="voicePeers"></div>
+
+<!-- Phase Display -->
+<div id="phaseDisplay"></div>
+
+<!-- Mic Float Button -->
+<div id="micFloat" class="off" onclick="toggleMic()">
+    <span id="micIcon">🎤</span>
+    <span id="micStatus">غير متصل</span>
+</div>
+
+<!-- Timer Component -->
+<div id="timerContainer" class="timer-container">
+    <div class="timer-text">
+        <span id="timerLabel">الوقت</span>
+        <span id="timerValue">30</span>
+    </div>
+    <div class="timer-bar">
+        <div id="timerFill" class="timer-fill" style="width:100%"></div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ══════════════════ HOME ══════════════════ -->
+<div id="screen-home" class="screen" style="display:block">
+    <h1>🕵️‍♂️ MAFIOSO TRIAL</h1>
+
+    <!-- اختيار اللعبة -->
+    <div id="game-select-view">
+        <p style="color:#888;margin-bottom:15px;font-size:.95em">اختار اللعبة اللي تحب تلعبها</p>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('mafioso')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🕵️‍♂️</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">مافيوسو تريال</h3>
+            <p style="color:#888;font-size:.85em">قصة جريمة بالذكاء الاصطناعي — المافيا والمواطنين والأدلة</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('classic')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🌙</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">المافيا الكلاسيك</h3>
+            <p style="color:#888;font-size:.85em">مافيا + دكتور + مواطنين — الليل والنهار بدون قصة</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:.2s" onclick="selectGame('impostor')" onmouseover="this.style.borderColor='#ffdf00'" onmouseout="this.style.borderColor='#d4af37'">
+            <div style="font-size:2em;margin-bottom:6px">🕵️</div>
+            <h3 style="color:#d4af37;margin-bottom:4px">الإمبوستر</h3>
+            <p style="color:#888;font-size:.85em">اعرف الكلمة السرية... أو كن الجاسوس!</p>
+        </div>
+    </div>
+
+    <!-- واجهة المافيوسو تريال -->
+    <div id="mafioso-join-view" style="display:none">
+        <button class="btn-gray btn-sm" onclick="backToGameSelect()" style="margin-bottom:10px">← رجوع</button>
+        <div class="card">
+            <div style="font-size:1.5em;margin-bottom:4px">🕵️‍♂️</div>
+            <h3 style="color:#d4af37;margin-bottom:10px">مافيوسو تريال</h3>
+            <button class="btn-green" onclick="createRoom()">إنشاء غرفة — أنا البوس 👑</button>
+            <hr class="sep">
+            <input type="text" id="playerName" placeholder="اكتب اسمك الحقيقي">
+            <input type="text" id="roomCodeInput" placeholder="كود الغرفة" style="letter-spacing:6px;text-transform:uppercase;text-align:center;font-size:20px" oninput="this.value=this.value.toUpperCase()">
+            <button class="btn-gray" onclick="joinRoom()">انضمام كلاعب 👤</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ WAITING ══════════════════ -->
+<div id="screen-wait" class="screen">
+    <div class="card" style="margin-top:40px">
+        <div class="loader"></div>
+        <h2 style="color:#d4af37;margin:10px 0">تم الانضمام ✅</h2>
+        <p id="wait-name" style="color:#00ffcc;font-weight:bold;font-size:1.1em"></p>
+        <p style="color:#888;margin-top:8px">انتظر البوس يبدأ الجيم...</p>
+        <p style="font-size:.8em;color:#555;margin-top:10px">(لا تغلق الصفحة)</p>
+    </div>
+</div>
+
+<!-- ══════════════════ BOSS LOBBY ══════════════════ -->
+<div id="screen-boss-lobby" class="screen">
+    <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
+
+    <!-- QR + Code -->
+    <div class="card">
+        <div id="qrcode"></div>
+        <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
+        <p style="color:#888;font-size:.85em">اللاعبون يسكنوا الـ QR أو يكتبوا الكود</p>
+        <button class="btn-blue btn-sm" onclick="shareRoom()" style="margin-top:8px">مشاركة الغرفة 📤</button>
+    </div>
+
+    <div class="card">
+        <h3 style="color:#d4af37;margin-bottom:10px">تجهيز الجولة</h3>
+        <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
+        <textarea id="tricks" placeholder="تريكات أو تفاصيل للقصة (اختياري)"></textarea>
+        <hr class="sep">
+        <span class="label">اللاعبون المتصلون:</span>
+        <div id="pList" style="margin:8px 0">انتظار...</div>
+        <p id="pCount" style="color:#888;font-size:.85em"></p>
+        <button id="startBtn" class="btn-green" onclick="startGame()" style="display:none">ابدأ الجيم 🚀</button>
+        <button class="btn-danger" onclick="closeRoom()">إغلاق الغرفة ❌</button>
+    </div>
+</div>
+
+<!-- ══════════════════ BOSS IN GAME ══════════════════ -->
+<div id="screen-boss-game" class="screen">
+    <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
+
+    <!-- القصة للبوس -->
+    <div class="card">
+        <span class="label">📖 القصة الكاملة (للبوس فقط)</span>
+        <div class="story-box" id="bossStory"></div>
+    </div>
+
+    <!-- الأدوار الحقيقية -->
+    <div class="card">
+        <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار الحقيقية</h4>
+        <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:1.8"></div>
+    </div>
+
+    <!-- الأدلة والهنتات -->
+    <div class="card">
+        <h4 style="color:#7fff7f;margin-bottom:8px">🔍 الأدلة والهنتات</h4>
+        <div id="clues-panel"><p style="color:#555;font-size:.9em">جاري توليد أول دليل...</p></div>
+        <hr class="sep">
+        <button class="btn-blue btn-sm" onclick="requestClue()">طلب دليل جديد 🔍</button>
+    </div>
+
+    <!-- Plot Twist -->
+    <div class="card" id="twistCard" style="display:none">
+        <h4 style="color:#ff6b6b;margin-bottom:8px">🌀 Plot Twist!</h4>
+        <div id="twistText" style="text-align:right;color:#ffb3b3;line-height:1.6;font-style:italic"></div>
+    </div>
+
+    <!-- التصويت -->
+    <div class="card">
+        <h4 style="margin-bottom:8px">📊 نتائج التصويت</h4>
+        <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
+        <hr class="sep">
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+            <button class="btn-green btn-sm" id="btnStartVote" onclick="startVotingPhase()">بدء التصويت 🗳️</button>
+            <button class="btn-blue btn-sm" id="btnReveal" onclick="revealResult()" style="display:none">كشف النتيجة 🎯</button>
+            <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء ❌</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ PLAYER GAME ══════════════════ -->
+<div id="screen-player-game" class="screen">
+    <div class="card">
+        <p style="color:#888;margin-bottom:10px">دورك:</p>
+        <div class="role-container">
+            <span id="roleName" class="role-hidden" onclick="toggleRole()">⬛⬛⬛⬛</span>
+            <span id="roleEye" style="font-size:1.2em;cursor:pointer" onclick="toggleRole()">👁️</span>
+        </div>
+        <p id="roleDesc" style="color:#aaa;font-size:.85em;margin-top:10px"></p>
+    </div>
+
+    <div id="storySection" class="card" style="display:none">
+        <span class="label">📖 القصة:</span>
+        <div class="story-box" id="storyText"></div>
+    </div>
+
+    <div id="voteSection" style="display:none" class="card">
+        <h4 style="color:#d4af37;margin-bottom:10px">🗳️ صوّت من المافيا؟</h4>
+        <div id="voteBtns"></div>
+    </div>
+
+    <div class="card">
+        <h4 style="color:#7fff7f;margin-bottom:8px">🔍 الأدلة:</h4>
+        <div id="myClues" style="text-align:right"><p style="color:#555;font-size:.9em">جاري التحميل...</p></div>
+    </div>
+
+    <div class="card">
+        <button class="btn-gray" onclick="requestPanic()" id="panicBtn">🚨 طلب Panic Mode</button>
+    </div>
+</div>
+
+<script>
+/* ================= WEBRTC VOICE ================= */
+let localStream=null, peerConns={}, micActive=false, micMuted=false, currentPhase='lobby', myRole='', isAlive=true;
+
+async function joinVoice() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+        micActive = true; micMuted = false;
+        updateMicUI();
+        socket.emit('joinVoice', {roomCode: myCode, name: myName});
+        showToast('🎤 انضممت للصوت', 2000);
+    } catch(e) {
+        showToast('⚠️ ما قدرت أدخل المايك: ' + e.message, 4000);
+    }
+}
+
+function toggleMic() {
+    if (!micActive) { joinVoice(); return; }
+    micMuted = !micMuted;
+    localStream?.getAudioTracks().forEach(t => t.enabled = !micMuted);
+    updateMicUI();
+}
+
+function updateMicUI() {
+    const btn = document.getElementById('micFloat');
+    const icon = document.getElementById('micIcon');
+    const status = document.getElementById('micStatus');
+    if (!micActive) {
+        btn.className = 'off'; icon.textContent = '🎤'; status.textContent = 'اضغط للتفعيل';
+    } else if (micMuted) {
+        btn.className = 'muted'; icon.textContent = '🔇'; status.textContent = 'مكتوم';
+    } else {
+        btn.className = 'active'; icon.textContent = '🎙️'; status.textContent = 'متصل';
+    }
+}
+
+function handlePhaseForMic(phase, role, alive) {
+    currentPhase = phase; myRole = role; isAlive = alive;
+    if (!micActive) return;
+    
+    const voicePeers = document.getElementById('voicePeers');
+    const phaseDisplay = document.getElementById('phaseDisplay');
+    
+    // Mute logic based on phase
+    if (phase === 'night_mafia') {
+        if (role !== 'mafia' && role !== 'boss') {
+            micMuted = true; localStream?.getAudioTracks().forEach(t => t.enabled = false);
+        } else {
+            micMuted = false; localStream?.getAudioTracks().forEach(t => t.enabled = true);
+        }
+        phaseDisplay.textContent = '🌙 ليل المافيا — المواطنين مكتومين';
+    } else if (phase === 'night_doctor') {
+        if (role !== 'doctor' && role !== 'boss') {
+            micMuted = true; localStream?.getAudioTracks().forEach(t => t.enabled = false);
+        } else {
+            micMuted = false; localStream?.getAudioTracks().forEach(t => t.enabled = true);
+        }
+        phaseDisplay.textContent = '🏥 ليل الدكتور — الباقي مكتومين';
+    } else if (phase === 'discussion') {
+        micMuted = !alive; localStream?.getAudioTracks().forEach(t => t.enabled = alive);
+        phaseDisplay.textContent = alive ? '☀️ وقت النقاش — الكل يتكلم' : '👻 أنت شبح — مكتوم';
+    } else if (phase === 'voting') {
+        micMuted = !alive; localStream?.getAudioTracks().forEach(t => t.enabled = alive);
+        phaseDisplay.textContent = alive ? '🗳️ وقت التصويت' : '👻 أنت شبح — مكتوم';
+    } else {
+        phaseDisplay.textContent = '';
+    }
+    
+    phaseDisplay.className = phase ? 'active' : '';
+    updateMicUI();
+}
+
+socket?.on('voicePeerJoined', ({id,name}) => {
+    const peers = document.getElementById('voicePeers');
+    peers.classList.add('active');
+    if (!document.getElementById('peer-'+id)) {
+        const el = document.createElement('div');
+        el.id = 'peer-'+id; el.className = 'voice-peer';
+        el.innerHTML = '<span class="peer-mic">🎙️</span><span>'+name+'</span>';
+        peers.appendChild(el);
+    }
+});
+
+socket?.on('voicePeerLeft', ({id}) => {
+    const el = document.getElementById('peer-'+id);
+    if (el) el.remove();
+    if (!document.querySelectorAll('.voice-peer').length) {
+        document.getElementById('voicePeers').classList.remove('active');
+    }
+});
+
+/* ================= UTILITY FUNCTIONS ================= */
+function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'block';
+}
+
+function showToast(msg, duration=3000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', duration);
+}
+
+function toggleRole() {
+    const roleEl = document.getElementById('roleName');
+    const current = roleEl.textContent;
+    if (current === '⬛⬛⬛⬛') {
+        roleEl.textContent = roleEl.dataset.role || 'مواطن';
+        roleEl.classList.remove('role-hidden'); roleEl.classList.add('role-visible');
+    } else {
+        roleEl.textContent = '⬛⬛⬛⬛';
+        roleEl.classList.remove('role-visible'); roleEl.classList.add('role-hidden');
+    }
+}
+
+function backToGameSelect() {
+    document.getElementById('game-select-view').style.display = 'block';
+    document.getElementById('mafioso-join-view').style.display = 'none';
+}
+
+function selectGame(game) {
+    if (game === 'mafioso') {
+        document.getElementById('game-select-view').style.display = 'none';
+        document.getElementById('mafioso-join-view').style.display = 'block';
+    } else if (game === 'classic') {
+        window.location.href = '/mafia-classic.html';
+    } else if (game === 'impostor') {
+        window.location.href = '/impostor.html';
+    }
+}
+
+/* ================= PLACEHOLDER FUNCTIONS ================= */
+function createRoom() { showToast('Creating room...', 2000); }
+function joinRoom() { showToast('Joining room...', 2000); }
+function startGame() { showToast('Starting game...', 2000); }
+function closeRoom() { showToast('Closing room...', 2000); }
+function shareRoom() { showToast('Sharing room...', 2000); }
+function startVotingPhase() { showToast('Starting vote...', 2000); }
+function revealResult() { showToast('Revealing result...', 2000); }
+function requestClue() { showToast('Requesting clue...', 2000); }
+function requestPanic() { showToast('Panic mode requested!', 2000); }
+function closeResult() { document.getElementById('resultOverlay').classList.remove('active'); }
+function toggleGhostChat() { document.getElementById('ghostChat').classList.toggle('active'); }
+function sendGhostMessage() { showToast('Sending message...', 2000); }
+</script>
+</body>
+</html>
