@@ -26,7 +26,27 @@ let useRedis = false;
 async function initRedis() {
     try {
         const { createClient } = require('redis');
-        redis = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
+        if (!process.env.REDIS_URL) {
+    console.warn('⚠️ No REDIS_URL found → using memory only');
+    useRedis = false;
+    return;
+}
+
+redis = createClient({ url: process.env.REDIS_URL });
+
+let redisErrorLogged = false;
+
+redis.on('error', (err) => {
+    if (!redisErrorLogged) {
+        console.warn('Redis error:', err.message);
+        redisErrorLogged = true;
+    }
+});
+
+
+await redis.connect();
+useRedis = true;
+console.log('✅ Redis connected');
         redis.on('error', (err) => console.warn('Redis error:', err.message));
         await redis.connect();
         useRedis = true;
@@ -36,7 +56,13 @@ async function initRedis() {
         useRedis = false;
     }
 }
+async function start() {
+    server.listen(PORT, () => {
+        console.log(`✅ Server on port ${PORT}`);
+    });
 
+    await initRedis();
+}
 // ════════════════════════════════════════════════
 //  Room Storage Adapter (Redis or Memory)
 // ════════════════════════════════════════════════
