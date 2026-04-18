@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
-        body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh;padding-bottom:100px}
+        body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh}
         h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
         .card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
         button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s}
@@ -71,47 +71,152 @@
         .btn-gray{background:#444!important;color:#fff!important}
         .btn-sm{width:auto!important;padding:8px 16px!important;font-size:14px!important}
 
-        /* ── Ghost Chat ── */
-        .ghost-chat{position:fixed;bottom:100px;right:10px;width:280px;max-height:300px;background:#0a0a0a;border:1px solid #555;border-radius:12px;display:none;flex-direction:column;z-index:100}
-        .ghost-chat.active{display:flex}
-        .ghost-chat-header{background:#1a1a1a;padding:10px;border-radius:12px 12px 0 0;color:#888;font-size:.85em;display:flex;justify-content:space-between;align-items:center}
-        .ghost-chat-messages{flex:1;overflow-y:auto;padding:10px;max-height:200px}
-        .ghost-chat-input{display:flex;padding:10px;border-top:1px solid #333}
-        .ghost-chat-input input{flex:1;margin:0;margin-left:8px}
-        .ghost-msg{margin:4px 0;padding:6px 10px;background:#1a1a1a;border-radius:8px;font-size:.9em}
-        .ghost-msg-name{color:#d4af37;font-size:.8em;margin-bottom:2px}
-        .ghost-msg-text{color:#aaa}
+        body { padding-bottom: 100px !important; }
+
+        /* ── Ghost Chat ══ */
+        .ghost-chat {
+            position: fixed;
+            bottom: 100px;
+            right: 10px;
+            width: 280px;
+            max-height: 300px;
+            background: #0a0a0a;
+            border: 1px solid #555;
+            border-radius: 12px;
+            display: none;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .ghost-chat.active {
+            display: flex;
+        }
+        .ghost-chat-header {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 12px 12px 0 0;
+            color: #888;
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ghost-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            max-height: 200px;
+        }
+        .ghost-chat-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #333;
+        }
+        .ghost-chat-input input {
+            flex: 1;
+            margin: 0;
+            margin-left: 8px;
+        }
+        .ghost-msg {
+            margin: 4px 0;
+            padding: 6px 10px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        .ghost-msg-name {
+            color: #d4af37;
+            font-size: 0.8em;
+            margin-bottom: 2px;
+        }
+        .ghost-msg-text {
+            color: #aaa;
+        }
 
         /* ── Role Toggle ── */
-        .role-hidden{color:transparent!important;background-color:#333!important;text-shadow:0 0 12px rgba(255,255,255,.7);border-color:#555!important;cursor:pointer;user-select:none;transition:.3s}
-        .role-visible{cursor:pointer;user-select:none;transition:.3s}
-        .role-container{display:inline-flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;background:#1a1a1a;padding:10px 20px;border-radius:10px;border:1px dashed #555}
+        .role-hidden {
+            color: transparent !important;
+            background-color: #333 !important;
+            text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+            border-color: #555 !important;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+        .role-visible {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+        .role-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            background: #1a1a1a;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px dashed #555;
+        }
 
         /* ── Timer ── */
-        .timer-container{position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#1a0a0a;border:2px solid #d4af37;border-radius:12px;padding:10px 20px;z-index:1000;display:none;box-shadow:0 4px 20px rgba(212,175,55,.3)}
-        .timer-container.active{display:block;animation:pulseTimer 1s infinite}
-        @keyframes pulseTimer{0%,100%{box-shadow:0 4px 20px rgba(212,175,55,.3)}50%{box-shadow:0 4px 30px rgba(212,175,55,.6)}}
-        .timer-bar{width:200px;height:6px;background:#333;border-radius:3px;overflow:hidden;margin-top:8px}
-        .timer-fill{height:100%;background:linear-gradient(90deg,#d4af37,#ff6b35);border-radius:3px;transition:width 1s linear}
-        .timer-text{color:#d4af37;font-weight:bold;font-size:1.2em;display:flex;justify-content:space-between;align-items:center}
-        .timer-label{font-size:.7em;color:#888;text-transform:uppercase;letter-spacing:1px}
-        .timer-urgent{color:#ff4d4d!important;animation:blink .5s infinite}
-        @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
-
-        /* ── Mic / Voice ── */
-        .mic-float{position:fixed;bottom:20px;right:20px;z-index:600;display:none}
-        .mic-float.active{display:flex;flex-direction:column;align-items:center;gap:6px}
-        .mic-btn{width:56px;height:56px;border-radius:50%;border:3px solid #d4af37;background:#1a1a1a;color:#d4af37;font-size:1.6em;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s;box-shadow:0 4px 15px rgba(0,0,0,.5);padding:0;margin:0}
-        .mic-btn:active{transform:scale(.9)}
-        .mic-btn.on{background:#28a745;border-color:#28a745;color:#fff;animation:micPulse 1.5s infinite}
-        .mic-btn.muted{background:#dc3545;border-color:#dc3545;color:#fff}
-        .mic-btn.off{background:#333;border-color:#555;color:#888}
-        @keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(40,167,69,.4)}50%{box-shadow:0 0 0 12px rgba(40,167,69,0)}}
-        .mic-status{font-size:.7em;color:#888;background:#111;padding:2px 8px;border-radius:8px;white-space:nowrap}
-        .voice-peers{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:120px}
-        .voice-peer{width:28px;height:28px;border-radius:50%;background:#222;border:2px solid #555;display:flex;align-items:center;justify-content:center;font-size:.7em;color:#aaa}
-        .voice-peer.speaking{border-color:#28a745;background:#0a2e0a}
-        .mic-phase-label{font-size:.65em;color:#d4af37;background:#1a1a0a;padding:2px 8px;border-radius:6px;text-align:center}
+        .timer-container {
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a0a0a;
+            border: 2px solid #d4af37;
+            border-radius: 12px;
+            padding: 10px 20px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 20px rgba(212,175,55,0.3);
+        }
+        .timer-container.active {
+            display: block;
+            animation: pulseTimer 1s infinite;
+        }
+        @keyframes pulseTimer {
+            0%, 100% { box-shadow: 0 4px 20px rgba(212,175,55,0.3); }
+            50% { box-shadow: 0 4px 30px rgba(212,175,55,0.6); }
+        }
+        .timer-bar {
+            width: 200px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .timer-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #d4af37, #ff6b35);
+            border-radius: 3px;
+            transition: width 1s linear;
+        }
+        .timer-text {
+            color: #d4af37;
+            font-weight: bold;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .timer-label {
+            font-size: 0.7em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .timer-urgent {
+            color: #ff4d4d !important;
+            animation: blink 0.5s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -120,7 +225,7 @@
 <div id="ghostChat" class="ghost-chat">
     <div class="ghost-chat-header">
         <span>👻 شات الأشباح</span>
-        <button onclick="toggleGhostChat()" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2em;width:auto;padding:0;margin:0">×</button>
+        <button onclick="toggleGhostChat()" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2em">×</button>
     </div>
     <div id="ghostChatMessages" class="ghost-chat-messages"></div>
     <div class="ghost-chat-input">
@@ -157,14 +262,6 @@
     <div class="timer-bar">
         <div id="timerFill" class="timer-fill" style="width: 100%"></div>
     </div>
-</div>
-
-<!-- Mic Float Button -->
-<div id="micFloat" class="mic-float">
-    <div class="mic-phase-label" id="micPhaseLabel"></div>
-    <div class="voice-peers" id="voicePeers"></div>
-    <button class="mic-btn off" id="micBtn" onclick="toggleMic()">🎙️</button>
-    <span class="mic-status" id="micStatus">المايك مقفول</span>
 </div>
 
 <!-- Toast -->
@@ -223,12 +320,15 @@
 <!-- ══════════════════ BOSS LOBBY ══════════════════ -->
 <div id="screen-boss-lobby" class="screen">
     <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
+
+    <!-- QR + Code -->
     <div class="card">
         <div id="qrcode"></div>
         <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
         <p style="color:#888;font-size:.85em">اللاعبون يسكنوا الـ QR أو يكتبوا الكود</p>
         <button class="btn-blue btn-sm" onclick="shareRoom()" style="margin-top:8px">مشاركة الغرفة 📤</button>
     </div>
+
     <div class="card">
         <h3 style="color:#d4af37;margin-bottom:10px">تجهيز الجولة</h3>
         <input type="text" id="crimeType" placeholder="نوع الجريمة (مثلاً: سرقة الهرم)">
@@ -245,24 +345,34 @@
 <!-- ══════════════════ BOSS IN GAME ══════════════════ -->
 <div id="screen-boss-game" class="screen">
     <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
+
+    <!-- القصة للبوس -->
     <div class="card">
         <span class="label">📖 القصة الكاملة (للبوس فقط)</span>
         <div class="story-box" id="bossStory"></div>
     </div>
+
+    <!-- الأدوار الحقيقية -->
     <div class="card">
         <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار الحقيقية</h4>
         <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:1.8"></div>
     </div>
+
+    <!-- الأدلة والهنتات (ثابتة تتراكم) -->
     <div class="card">
         <h4 style="color:#7fff7f;margin-bottom:8px">🔍 الأدلة والهنتات</h4>
         <div id="clues-panel"><p style="color:#555;font-size:.9em">جاري توليد أول دليل...</p></div>
         <hr class="sep">
         <button class="btn-blue btn-sm" onclick="requestClue()">طلب دليل جديد 🔍</button>
     </div>
+
+    <!-- Plot Twist من Panic -->
     <div class="card" id="twistCard" style="display:none">
         <h4 style="color:#ff6b6b;margin-bottom:8px">🌀 Plot Twist!</h4>
         <div id="twistText" style="text-align:right;color:#ffb3b3;line-height:1.6;font-style:italic"></div>
     </div>
+
+    <!-- التصويت -->
     <div class="card">
         <h4 style="margin-bottom:8px">📊 نتائج التصويت</h4>
         <div id="vStats" style="text-align:right;min-height:40px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
@@ -279,10 +389,14 @@
 <!-- ══════════════════ PLAYER IN GAME ══════════════════ -->
 <div id="screen-player-game" class="screen">
     <div id="playerContent"></div>
+
+    <!-- Ghost notice -->
     <div id="ghostNotice" style="display:none" class="card">
         <p style="color:#888">👻 أنت خرجت من اللعبة</p>
         <div id="ghostVoteSection"></div>
     </div>
+
+    <!-- Vote UI -->
     <div id="vUI" style="display:none" class="card">
         <h3 style="margin-bottom:10px">🗳️ صوّت ضد المافيوسو:</h3>
         <div id="vBtns"></div>
@@ -291,7 +405,7 @@
 
 <script>
 // ════════════════════════════════════════════════
-//  State & Session
+//  State & Session - SECURE VERSION (No role storage)
 // ════════════════════════════════════════════════
 const socket = io({
     reconnection: true,
@@ -302,17 +416,31 @@ const socket = io({
 });
 
 let myCode='', myName='', isBoss=false, currentRole=null, isAlive=true, isGhost=false;
-let currentPhase = 'lobby'; // track phase for mic logic
 
 const SS = {
+    // بس الكود والاسم، مفيش gameData أو roles!
     save(d){ 
         try{
-            const safeData = { code:d.code, name:d.name, isBoss:d.isBoss, bossToken:d.bossToken, _connected:d._connected };
+            const safeData = {
+                code: d.code,
+                name: d.name,
+                isBoss: d.isBoss,
+                bossToken: d.bossToken,
+                _connected: d._connected
+            };
             localStorage.setItem('mfss', JSON.stringify(safeData));
         }catch(e){} 
     },
-    load(){ try{return JSON.parse(localStorage.getItem('mfss')||'{}')}catch(e){return{}} },
-    clear(){ try{localStorage.removeItem('mfss')}catch(e){} }
+    load(){ 
+        try{
+            return JSON.parse(localStorage.getItem('mfss')||'{}');
+        }catch(e){
+            return{};
+        } 
+    },
+    clear(){ 
+        try{localStorage.removeItem('mfss')}catch(e){} 
+    }
 };
 
 // ════════════════════════════════════════════════
@@ -326,193 +454,44 @@ function startTimer(seconds, label, onComplete) {
     clearInterval(timerInterval);
     timeLeft = seconds;
     totalTime = seconds;
+    
     const container = document.getElementById('timerContainer');
     const valueEl = document.getElementById('timerValue');
     const labelEl = document.getElementById('timerLabel');
     const fillEl = document.getElementById('timerFill');
+    
     container.classList.add('active');
     labelEl.textContent = label;
     valueEl.textContent = seconds;
     valueEl.classList.remove('timer-urgent');
     fillEl.style.width = '100%';
     fillEl.style.background = 'linear-gradient(90deg, #d4af37, #ff6b35)';
+    
     timerInterval = setInterval(() => {
         timeLeft--;
         valueEl.textContent = timeLeft;
-        const pct = (timeLeft / totalTime) * 100;
-        fillEl.style.width = pct + '%';
-        if(timeLeft <= 5){ valueEl.classList.add('timer-urgent'); fillEl.style.background = '#ff4d4d'; }
-        if(timeLeft <= 0){ clearInterval(timerInterval); container.classList.remove('active'); if(onComplete) onComplete(); }
+        
+        // Progress bar
+        const percentage = (timeLeft / totalTime) * 100;
+        fillEl.style.width = percentage + '%';
+        
+        // Urgent color
+        if(timeLeft <= 5) {
+            valueEl.classList.add('timer-urgent');
+            fillEl.style.background = '#ff4d4d';
+        }
+        
+        if(timeLeft <= 0) {
+            clearInterval(timerInterval);
+            container.classList.remove('active');
+            if(onComplete) onComplete();
+        }
     }, 1000);
 }
 
 function stopTimer() {
     clearInterval(timerInterval);
     document.getElementById('timerContainer').classList.remove('active');
-}
-
-// ════════════════════════════════════════════════
-//  Voice / Mic System (WebRTC)
-// ════════════════════════════════════════════════
-let localStream = null;
-let peerConnections = {};
-let micOn = false;
-let inVoiceRoom = false;
-
-const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-function showMic(show) {
-    document.getElementById('micFloat').classList.toggle('active', show);
-}
-
-function updateMicUI() {
-    const btn = document.getElementById('micBtn');
-    const status = document.getElementById('micStatus');
-    const phaseLabel = document.getElementById('micPhaseLabel');
-    
-    const phaseNames = {
-        lobby: '',
-        night_mafia: '🌙 الليل',
-        night_doctor: '💉 الدكتور',
-        discussion: '💬 نقاش',
-        day: '☀️ تصويت',
-        voting: '🗳️ تصويت'
-    };
-    phaseLabel.textContent = phaseNames[currentPhase] || '';
-
-    if (!inVoiceRoom) {
-        btn.className = 'mic-btn off';
-        btn.textContent = '🎙️';
-        status.textContent = 'اضغط للانضمام';
-        return;
-    }
-    if (micOn) {
-        btn.className = 'mic-btn on';
-        btn.textContent = '🎙️';
-        status.textContent = 'المايك شغال';
-    } else {
-        btn.className = 'mic-btn muted';
-        btn.textContent = '🔇';
-        status.textContent = 'المايك مكتوم';
-    }
-}
-
-async function toggleMic() {
-    if (!inVoiceRoom) {
-        // First press: join voice room + unmute
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            socket.emit('joinVoice', myCode);
-            inVoiceRoom = true;
-            micOn = true;
-            updateMicUI();
-            showToast('🎙️ انضممت للمايك!', 2000);
-        } catch(e) {
-            showToast('⚠️ مفيش إذن للمايك!', 3000);
-        }
-        return;
-    }
-    // Toggle mute/unmute
-    micOn = !micOn;
-    if (localStream) {
-        localStream.getAudioTracks().forEach(t => t.enabled = micOn);
-    }
-    updateMicUI();
-}
-
-function leaveVoice() {
-    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-    Object.values(peerConnections).forEach(pc => pc.close());
-    peerConnections = {};
-    inVoiceRoom = false;
-    micOn = false;
-    updateMicUI();
-    document.getElementById('voicePeers').innerHTML = '';
-}
-
-// WebRTC Signaling
-socket.on('user-joined-voice', async (userId) => {
-    if (!localStream) return;
-    const pc = new RTCPeerConnection(ICE_SERVERS);
-    peerConnections[userId] = pc;
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-    pc.onicecandidate = (e) => { if(e.candidate) socket.emit('webrtc-ice-candidate', { target: userId, candidate: e.candidate }); };
-    pc.ontrack = (e) => { playRemoteAudio(userId, e.streams[0]); };
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit('webrtc-offer', { target: userId, sdp: offer });
-    addVoicePeer(userId);
-});
-
-socket.on('webrtc-offer', async (d) => {
-    if (!localStream) return;
-    const pc = new RTCPeerConnection(ICE_SERVERS);
-    peerConnections[d.sender] = pc;
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-    pc.onicecandidate = (e) => { if(e.candidate) socket.emit('webrtc-ice-candidate', { target: d.sender, candidate: e.candidate }); };
-    pc.ontrack = (e) => { playRemoteAudio(d.sender, e.streams[0]); };
-    await pc.setRemoteDescription(d.sdp);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit('webrtc-answer', { target: d.sender, sdp: answer });
-    addVoicePeer(d.sender);
-});
-
-socket.on('webrtc-answer', async (d) => {
-    const pc = peerConnections[d.sender];
-    if (pc) await pc.setRemoteDescription(d.sdp);
-});
-
-socket.on('webrtc-ice-candidate', async (d) => {
-    const pc = peerConnections[d.sender];
-    if (pc) await pc.addIceCandidate(d.candidate);
-});
-
-function playRemoteAudio(userId, stream) {
-    let audio = document.getElementById('audio_' + userId);
-    if (!audio) { audio = document.createElement('audio'); audio.id = 'audio_' + userId; audio.autoplay = true; document.body.appendChild(audio); }
-    audio.srcObject = stream;
-}
-
-function addVoicePeer(userId) {
-    const peers = document.getElementById('voicePeers');
-    if (document.getElementById('vp_' + userId)) return;
-    const div = document.createElement('div');
-    div.className = 'voice-peer'; div.id = 'vp_' + userId;
-    div.textContent = '🔊';
-    peers.appendChild(div);
-}
-
-function removeVoicePeer(userId) {
-    const el = document.getElementById('vp_' + userId);
-    if (el) el.remove();
-    const audio = document.getElementById('audio_' + userId);
-    if (audio) audio.remove();
-    if (peerConnections[userId]) { peerConnections[userId].close(); delete peerConnections[userId]; }
-}
-
-// Phase-based mic control
-function handlePhaseForMic(phase) {
-    currentPhase = phase;
-    updateMicUI();
-    
-    // Auto-mute during night phases for non-mafia
-    if (phase === 'night_mafia' || phase === 'night_doctor') {
-        if (!isBoss && currentRole && !currentRole.includes('🔪')) {
-            // Civilians muted at night
-            if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = false);
-            micOn = false;
-            updateMicUI();
-        }
-    }
-    // Discussion phase: everyone can talk
-    if (phase === 'discussion' || phase === 'day') {
-        if (inVoiceRoom && localStream && isAlive) {
-            localStream.getAudioTracks().forEach(t => t.enabled = true);
-            micOn = true;
-            updateMicUI();
-        }
-    }
 }
 
 // ════════════════════════════════════════════════
@@ -528,12 +507,19 @@ socket.on('disconnect', ()=>{
 socket.on('connect', ()=>{
     const sess = SS.load();
     if(!sess.code) return;
-    if(sess._connected){ connBar.textContent='✅ رجع الاتصال!'; connBar.className='online'; }
+
+    if(sess._connected){
+        connBar.textContent='✅ رجع الاتصال!';
+        connBar.className='online';
+    }
     sess._connected=true; SS.save(sess);
+
     myCode=sess.code; myName=sess.name; isBoss=sess.isBoss;
+
     if(isBoss){
         socket.emit('bossReconnect',{roomCode:sess.code, bossToken:sess.bossToken});
     } else {
+        // ⚠️ مفيش restorePlayerScreen - نستنى السيرفر يبعت الداتا من اول وجديد
         show('screen-wait');
         document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
         socket.emit('playerReconnect',{roomCode:sess.code, playerName:sess.name});
@@ -541,15 +527,21 @@ socket.on('connect', ()=>{
 });
 
 // ════════════════════════════════════════════════
-//  Room Events
+//  Room Ended (from boss closeRoom or server)
 // ════════════════════════════════════════════════
 socket.on('roomEnded', ()=>{
-    SS.clear(); leaveVoice(); showMic(false); stopTimer();
+    SS.clear();
     showToast('الغرفة أُغلقت من البوس', 3000);
-    setTimeout(()=>location.reload(), 2000);
+    setTimeout(()=>{ location.reload(); }, 2000);
 });
 
-function createRoom(){ isBoss=true; socket.emit('createRoom'); }
+// ════════════════════════════════════════════════
+//  Boss — Create
+// ════════════════════════════════════════════════
+function createRoom(){
+    isBoss=true;
+    socket.emit('createRoom');
+}
 
 socket.on('roomCreated', (c)=>{
     myCode=c;
@@ -562,17 +554,23 @@ function initBossLobby(c){
     document.getElementById('bossRoomTitle').textContent='الغرفة: '+c;
     document.getElementById('lobbyCode').textContent=c;
     document.getElementById('bossGameTitle').textContent='البوس — الغرفة: '+c;
-    const qrDiv=document.getElementById('qrcode'); qrDiv.innerHTML='';
-    new QRCode(qrDiv,{text:window.location.origin+'?code='+c,width:160,height:160,colorDark:'#000',colorLight:'#fff'});
+    // QR Code
+    const qrDiv = document.getElementById('qrcode');
+    qrDiv.innerHTML='';
+    const url = window.location.origin+'?code='+c;
+    new QRCode(qrDiv,{text:url, width:160, height:160, colorDark:'#000', colorLight:'#fff'});
 }
 
 socket.on('bossReconnected', (data)=>{
     initBossLobby(myCode);
     if(data.started){
-        show('screen-boss-game'); showMic(true);
+        show('screen-boss-game');
         if(data.scenario) document.getElementById('bossStory').textContent=data.scenario.story;
         if(data.players) renderBossSecrets(data.players);
-        if(data.clues && data.clues.length>0){ document.getElementById('clues-panel').innerHTML=''; data.clues.forEach(c=>addClue(c)); }
+        if(data.clues && data.clues.length>0){
+            document.getElementById('clues-panel').innerHTML='';
+            data.clues.forEach(c=>addClue(c));
+        }
     } else {
         show('screen-boss-lobby');
         if(data.players && data.players.length>0) updatePlayerList(data.players);
@@ -592,28 +590,40 @@ function joinRoom(){
 }
 
 socket.on('joinedSuccess', (data)=>{
-    if(!data?.reconnected){ show('screen-wait'); document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋'; }
+    if(!data?.reconnected){
+        show('screen-wait');
+        document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';
+    }
 });
 
 // ════════════════════════════════════════════════
-//  Ghost Chat
+//  Ghost Chat System
 // ════════════════════════════════════════════════
-function toggleGhostChat(){ document.getElementById('ghostChat').classList.toggle('active'); }
-
-function sendGhostMessage(){
-    const input=document.getElementById('ghostChatInput');
-    const msg=input.value.trim();
-    if(!msg) return;
-    socket.emit('ghostMessage', { roomCode: myCode, message: msg });
-    input.value='';
+function toggleGhostChat() {
+    const chat = document.getElementById('ghostChat');
+    chat.classList.toggle('active');
 }
 
-socket.on('ghostMessage', (d)=>{
-    if(!isAlive){
-        const container=document.getElementById('ghostChatMessages');
-        const div=document.createElement('div'); div.className='ghost-msg';
-        div.innerHTML='<div class="ghost-msg-name">'+d.name+'</div><div class="ghost-msg-text">'+d.message+'</div>';
-        container.appendChild(div); container.scrollTop=container.scrollHeight;
+function sendGhostMessage() {
+    const input = document.getElementById('ghostChatInput');
+    const msg = input.value.trim();
+    if(!msg) return;
+    
+    socket.emit('ghostMessage', { roomCode: myCode, message: msg });
+    input.value = '';
+}
+
+socket.on('ghostMessage', (d) => {
+    // نعرض بس لو انت ميت
+    if(!isAlive) {
+        const container = document.getElementById('ghostChatMessages');
+        const div = document.createElement('div');
+        div.className = 'ghost-msg';
+        div.innerHTML = '<div class="ghost-msg-name">' + d.name + '</div><div class="ghost-msg-text">' + d.message + '</div>';
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        
+        // نفتح الشات لو مقفول
         document.getElementById('ghostChat').classList.add('active');
     }
 });
@@ -622,8 +632,14 @@ socket.on('ghostMessage', (d)=>{
 //  Players List (Boss Lobby)
 // ════════════════════════════════════════════════
 function updatePlayerList(players){
-    const list=document.getElementById('pList'), cnt=document.getElementById('pCount');
-    if(!players.length){ list.innerHTML='<span style="color:#555">انتظار...</span>'; cnt.textContent=''; document.getElementById('startBtn').style.display='none'; return; }
+    const list=document.getElementById('pList');
+    const cnt=document.getElementById('pCount');
+    if(!players.length){
+        list.innerHTML='<span style="color:#555">انتظار...</span>';
+        cnt.textContent='';
+        document.getElementById('startBtn').style.display='none';
+        return;
+    }
     list.innerHTML=players.map(p=>'<span class="player-tag">👤 '+p.name+'</span>').join('');
     cnt.textContent='✅ '+players.length+' لاعب جاهز';
     document.getElementById('startBtn').style.display='block';
@@ -635,24 +651,26 @@ socket.on('updatePlayers', updatePlayerList);
 // ════════════════════════════════════════════════
 function startGame(){
     const btn=document.getElementById('startBtn');
-    btn.textContent='جاري التحميل... ✨'; btn.disabled=true;
-    socket.emit('startGame',{ roomCode:myCode, crimeType:document.getElementById('crimeType').value, tricks:document.getElementById('tricks').value });
+    btn.textContent='جاري التحميل... ✨';
+    btn.disabled=true;
+    socket.emit('startGame',{
+        roomCode:myCode,
+        crimeType:document.getElementById('crimeType').value,
+        tricks:document.getElementById('tricks').value
+    });
 }
-socket.on('error', (msg)=>{
+socket.on('error', (msg) => {
     alert("⚠️ " + msg);
-    const startBtn=document.getElementById('startBtn');
-    if(startBtn) startBtn.innerText="ابدأ الجيم 🚀";
+    const startBtn = document.getElementById('startBtn');
+    if(startBtn) startBtn.innerText = "ابدأ الجيم 🚀";
 });
-
 // ════════════════════════════════════════════════
 //  Boss Game Data
 // ════════════════════════════════════════════════
 socket.on('bossData', (d)=>{
     show('screen-boss-game');
-    showMic(true);
     document.getElementById('bossStory').textContent=d.story;
     renderBossSecrets(d.players);
-    handlePhaseForMic('discussion');
 });
 
 function renderBossSecrets(players){
@@ -662,122 +680,188 @@ function renderBossSecrets(players){
 }
 
 // ════════════════════════════════════════════════
-//  Clues
+//  Clues (Boss Only, Persistent)
 // ════════════════════════════════════════════════
 function addClue(clueObj){
     const panel=document.getElementById('clues-panel');
     if(panel.querySelector('p')) panel.innerHTML='';
-    const div=document.createElement('div'); div.className='clue-item';
+    
+    const div=document.createElement('div');
+    div.className='clue-item';
     div.innerHTML='<div class="clue-meta">جولة '+clueObj.round+' — '+clueObj.time+'</div><div class="clue-text">🔍 '+clueObj.text+'</div>';
-    if(isBoss){
-        const btn=document.createElement('button'); btn.className='btn-gray btn-sm'; btn.style.marginTop='8px'; btn.textContent='إرسال للاعبين 📢';
-        btn.onclick=()=>{ socket.emit('shareClue',{roomCode:myCode,clue:clueObj}); showToast('✅ تم إرسال الدليل!',3000); btn.disabled=true; btn.textContent='تم الإرسال ✔️'; };
+    
+    if(isBoss) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-gray btn-sm';
+        btn.style.marginTop = '8px';
+        btn.textContent = 'إرسال للاعبين 📢';
+        btn.onclick = () => {
+            socket.emit('shareClue', { roomCode: myCode, clue: clueObj });
+            showToast('✅ تم إرسال الدليل للاعبين!', 3000);
+            btn.disabled = true;
+            btn.textContent = 'تم الإرسال ✔️';
+        };
         div.appendChild(btn);
     }
-    panel.appendChild(div); panel.scrollTop=panel.scrollHeight;
+    
+    panel.appendChild(div);
+    panel.scrollTop=panel.scrollHeight;
 }
 
-socket.on('clueShared', (clueObj)=>{
-    if(!isBoss){
-        const cluesContainer=document.getElementById('playerClues'), list=document.getElementById('playerCluesList');
-        if(cluesContainer&&list){ cluesContainer.style.display='block'; list.innerHTML+='<div style="border-bottom:1px solid #2d6a2d;padding-bottom:5px;margin-bottom:5px"><span style="font-size:.7em;color:#888">جولة '+clueObj.round+':</span> <span style="color:#7fff7f;font-size:.95em">'+clueObj.text+'</span></div>'; showToast('📢 البوس أرسل دليلاً جديداً!',5000); }
+// استقبال اللاعبين للدليل من البوس
+socket.on('clueShared', (clueObj) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += '<div style="border-bottom:1px solid #2d6a2d; padding-bottom:5px; margin-bottom:5px;"><span style="font-size:0.7em; color:#888;">جولة '+clueObj.round+':</span> <span style="color:#7fff7f; font-size:0.95em;">'+clueObj.text+'</span></div>';
+            showToast('📢 البوس أرسل دليلاً جديداً، اقرأه الآن!', 5000);
+        }
+    }
+});
+// استقبال اللاعبين للحدث المفاجئ (التويست)
+socket.on('twistShared', (twist) => {
+    if(!isBoss) {
+        const cluesContainer = document.getElementById('playerClues');
+        const list = document.getElementById('playerCluesList');
+        if(cluesContainer && list) {
+            cluesContainer.style.display = 'block';
+            list.innerHTML += '<div style="border-bottom:1px dashed #ff6b6b; padding-bottom:8px; margin-bottom:8px; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px;"><span style="font-size:0.85em; color:#ff6b6b; font-weight:bold;">🚨 حدث مفاجئ (Plot Twist):</span><br><span style="color:#ffb3b3; font-size:1em; font-style:italic;">'+twist+'</span></div>';
+            showToast('🚨 البوس أرسل حدثاً مفاجئاً، انتبه!', 5000);
+        }
     }
 });
 
-socket.on('twistShared', (twist)=>{
-    if(!isBoss){
-        const cluesContainer=document.getElementById('playerClues'), list=document.getElementById('playerCluesList');
-        if(cluesContainer&&list){ cluesContainer.style.display='block'; list.innerHTML+='<div style="border-bottom:1px dashed #ff6b6b;padding-bottom:8px;margin-bottom:8px;background:rgba(255,0,0,.1);padding:10px;border-radius:5px"><span style="font-size:.85em;color:#ff6b6b;font-weight:bold">🚨 حدث مفاجئ:</span><br><span style="color:#ffb3b3;font-size:1em;font-style:italic">'+twist+'</span></div>'; showToast('🚨 البوس أرسل حدثاً مفاجئاً!',5000); }
-    }
+socket.on('receiveClue', (clueObj)=>{
+    addClue(clueObj);
+    showToast('🔍 دليل جديد وصل!', 2500);
 });
 
-socket.on('receiveClue', (clueObj)=>{ addClue(clueObj); showToast('🔍 دليل جديد وصل!',2500); });
-
-function requestClue(){ socket.emit('requestPhysicalClue',myCode); showToast('جاري توليد دليل...',2000); }
+function requestClue(){
+    socket.emit('requestPhysicalClue', myCode);
+    showToast('جاري توليد دليل...', 2000);
+}
 
 // ════════════════════════════════════════════════
 //  Player Game Data
 // ════════════════════════════════════════════════
 socket.on('gameData', (d)=>{
-    currentRole=d.role; isAlive=d.isAlive;
+    currentRole = d.role;
+    isAlive = d.isAlive;
     restorePlayerScreen(d, false, d.isAlive);
-    showMic(true);
-    handlePhaseForMic('discussion');
 });
 
 function restorePlayerScreen(d, alreadyVoted, aliveStatus){
     show('screen-player-game');
     const isMafia=d.role.includes('🔪');
-    isAlive=aliveStatus; isGhost=!aliveStatus;
-    let roleDisplay='', secretDisplay='';
+    isAlive = aliveStatus;
+    isGhost = !aliveStatus;
+    
+    let roleDisplay = '';
+    let secretDisplay = '';
+    
+    // لو ميت، شوف كل حاجة (Spectator Mode)
     if(!aliveStatus){
-        roleDisplay='<span class="badge-civ">👻 شبح (متفرج)</span>';
-        secretDisplay='<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🎭 دورك الأصلي كان:</span><p style="color:#d4af37;margin-top:4px;font-weight:bold">'+d.role+'</p></div>';
+        roleDisplay = '<span class="badge-civ">👻 شبح (متفرج)</span>';
+        secretDisplay = '<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🎭 دورك الأصلي كان:</span><p style="color:#d4af37;margin-top:4px;font-weight:bold">'+d.role+'</p></div>';
     } else {
-        roleDisplay='<span id="mySecretRole" class="role-hidden '+(isMafia?'badge-mafia':'badge-civ')+'">'+d.role+'</span>';
-        secretDisplay='<div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span><p style="color:#00ffcc;margin-top:4px">'+d.charSecret+'</p></div>';
+        // لو عايش، الدور مخفي
+        roleDisplay = '<span id="mySecretRole" class="role-hidden '+(isMafia?'badge-mafia':'badge-civ')+'">'+d.role+'</span>';
+        secretDisplay = '<div style="background:#111;border-radius:8px;padding:10px;margin:8px 0;text-align:right"><span style="color:#666;font-size:.8em">🤫 سرك الخاص:</span><p style="color:#00ffcc;margin-top:4px">'+d.charSecret+'</p></div>';
     }
-
+    
     document.getElementById('playerContent').innerHTML='\
         <div class="card">\
             <h2 style="color:#d4af37;margin-bottom:6px">'+d.charName+'</h2>\
             <div class="story-box">'+d.story+'</div>\
             '+secretDisplay+'\
-            '+(aliveStatus?'<p style="color:#888;font-size:.8em;margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>\
+            '+(aliveStatus ? '<p style="color:#888; font-size:0.8em; margin-top:10px;">اضغط على العين لكشف/إخفاء دورك</p>\
             <div class="role-container" onclick="toggleRole()">\
-                <span style="font-size:1.8em;">👁️</span>\
+                <span style="font-size: 1.8em;">👁️</span>\
                 '+roleDisplay+'\
-            </div>':'<div class="role-container" style="border-color:#555;">\
-                <span style="font-size:1.8em;">👻</span>\
+            </div>' : '<div class="role-container" style="border-color:#555;">\
+                <span style="font-size: 1.8em;">👻</span>\
                 '+roleDisplay+'\
             </div>\
-            <p style="color:#888;font-size:.8em;margin-top:10px;">أنت الآن متفرج</p>')+'\
-            <div id="playerClues" style="display:none;margin-top:15px;background:#0d1f0d;border:1px solid #2d6a2d;border-radius:8px;padding:10px;text-align:right">\
-                <h4 style="color:#7fff7f;margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>\
+            <p style="color:#888;font-size:.8em;margin-top:10px;">أنت الآن متفرج، تقدر تشوف كل الأدوار!</p>')+'\
+            <div id="playerClues" style="display:none; margin-top:15px; background:#0d1f0d; border:1px solid #2d6a2d; border-radius:8px; padding:10px; text-align:right;">\
+                <h4 style="color:#7fff7f; margin-bottom:8px">📢 أدلة التحقيق (من البوس)</h4>\
                 <div id="playerCluesList"></div>\
             </div>\
         </div>';
 
     const ghostDiv=document.getElementById('ghostNotice');
     document.getElementById('vUI').style.display='none';
+    
     if(!aliveStatus){
         ghostDiv.style.display='block';
+        // فتح شات الأشباح
         document.getElementById('ghostChat').classList.add('active');
+        // Spectator Mode: نطلب من السيرفر يبعتنا كل الأدوار
         socket.emit('requestSpectatorData', myCode);
-        // Mute mic when dead
-        if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
-        micOn=false; updateMicUI();
     } else {
         ghostDiv.style.display='none';
     }
 }
 
-function toggleRole(){
-    const roleSpan=document.getElementById('mySecretRole');
-    if(roleSpan.classList.contains('role-hidden')){ roleSpan.classList.remove('role-hidden'); roleSpan.classList.add('role-visible'); }
-    else { roleSpan.classList.add('role-hidden'); roleSpan.classList.remove('role-visible'); }
+// دالة تشغيل العين
+function toggleRole() {
+    const roleSpan = document.getElementById('mySecretRole');
+    if(roleSpan.classList.contains('role-hidden')) {
+        roleSpan.classList.remove('role-hidden');
+        roleSpan.classList.add('role-visible');
+    } else {
+        roleSpan.classList.add('role-hidden');
+        roleSpan.classList.remove('role-visible');
+    }
 }
 
 // ════════════════════════════════════════════════
 //  Voting
 // ════════════════════════════════════════════════
 function renderVoteButtons(chars, ghostVoting){
-    const vUI=document.getElementById('vUI'), ghostDiv=document.getElementById('ghostNotice'), ghostVoteSec=document.getElementById('ghostVoteSection'), vBtns=document.getElementById('vBtns');
-    if(!chars||chars.length===0){ vUI.style.display='none'; if(ghostVoteSec) ghostVoteSec.innerHTML=''; return; }
+    const vUI=document.getElementById('vUI');
+    const ghostDiv=document.getElementById('ghostNotice');
+    const ghostVoteSec=document.getElementById('ghostVoteSection');
+    const vBtns=document.getElementById('vBtns');
+
+    if(!chars || chars.length===0){
+        vUI.style.display='none';
+        if(ghostVoteSec) ghostVoteSec.innerHTML = '';
+        return;
+    }
+
+    // تصويت الميتين (حالة الـ 1v1)
     if(ghostVoting){
         ghostDiv.style.display='block';
-        ghostVoteSec.innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — حدد مين المافيوسو:</p>';
+        ghostVoteSec.innerHTML='<p style="color:#d4af37;margin-bottom:8px">👻 صوتك مهم — ساعد المدينة! حدد مين المافيوسو:</p>';
         chars.forEach(char=>{
-            const btn=document.createElement('button'); btn.className='btn-blue'; btn.style.width='45%'; btn.textContent=char;
-            btn.onclick=()=>{ socket.emit('castVote',{roomCode:myCode,votedForChar:char}); ghostVoteSec.innerHTML='<p style="color:#27ae60">✅ تم تسجيل صوتك كشبح!</p>'; };
+            const btn=document.createElement('button');
+            btn.className = 'btn-blue';
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                ghostVoteSec.innerHTML='<p style="color:#27ae60">✅ تم تسجيل صوتك كشبح!</p>';
+            };
             ghostVoteSec.appendChild(btn);
         });
         vUI.style.display='none';
-    } else {
-        vUI.style.display='block'; vBtns.innerHTML='';
+    } 
+    // تصويت الأحياء العادي
+    else {
+        vUI.style.display='block';
+        vBtns.innerHTML='';
         chars.forEach(char=>{
-            const btn=document.createElement('button'); btn.style.width='45%'; btn.textContent=char;
-            btn.onclick=()=>{ socket.emit('castVote',{roomCode:myCode,votedForChar:char}); vUI.style.display='none'; showToast('✅ تم إرسال صوتك!'); };
+            const btn=document.createElement('button');
+            btn.style.width='45%';
+            btn.textContent=char;
+            btn.onclick=()=>{
+                socket.emit('castVote',{roomCode:myCode, votedForChar:char});
+                vUI.style.display='none';
+                showToast('✅ تم إرسال صوتك!');
+            };
             vBtns.appendChild(btn);
         });
     }
@@ -785,17 +869,20 @@ function renderVoteButtons(chars, ghostVoting){
 
 socket.on('voteResultUpdate', (d)=>{
     let s='';
-    for(let k in d.details) s+='<p style="text-align:right">'+k+': <b style="color:#d4af37">'+d.details[k]+'</b> أصوات</p>';
+    for(let k in d.details)
+        s+='<p style="text-align:right">'+k+': <b style="color:#d4af37">'+d.details[k]+'</b> أصوات</p>';
     s+='<p style="color:#555;font-size:.8em;text-align:right">إجمالي: '+d.totalVotes+'</p>';
     document.getElementById('vStats').innerHTML=s;
 });
 
 socket.on('nextRound', (data)=>{
     if(!isBoss){
-        if(data.canVote && data.chars.length>0) renderVoteButtons(data.chars, data.isGhost||false);
-        else if(!data.canVote) document.getElementById('vUI').style.display='none';
+        if(data.canVote && data.chars.length>0){
+            renderVoteButtons(data.chars, data.isGhost||false);
+        } else if(!data.canVote){
+            document.getElementById('vUI').style.display='none';
+        }
     }
-    handlePhaseForMic('discussion');
 });
 
 // ════════════════════════════════════════════════
@@ -803,47 +890,66 @@ socket.on('nextRound', (data)=>{
 // ════════════════════════════════════════════════
 let panicInterval=null;
 
-function triggerPanic(){ socket.emit('triggerPanic', myCode); }
+function triggerPanic(){
+    socket.emit('triggerPanic', myCode);
+}
 
 socket.on('panicAction', ()=>{
-    const overlay=document.getElementById('panicOverlay'), timerEl=document.getElementById('panicTimer');
+    const overlay=document.getElementById('panicOverlay');
+    const timerEl=document.getElementById('panicTimer');
     document.getElementById('panicTwistText').textContent='';
     overlay.classList.add('active');
+
+    // Web Audio beeps
     try{
         const ctx=new(window.AudioContext||window.webkitAudioContext)();
         for(let i=0;i<10;i++){
-            const o=ctx.createOscillator(),g=ctx.createGain();
-            o.connect(g);g.connect(ctx.destination);
-            o.frequency.value=i%2===0?880:660; o.type='sawtooth';
+            const o=ctx.createOscillator(), g=ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value=i%2===0?880:660;
+            o.type='sawtooth';
             g.gain.setValueAtTime(.25,ctx.currentTime+i);
             g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+i+.6);
-            o.start(ctx.currentTime+i); o.stop(ctx.currentTime+i+.65);
+            o.start(ctx.currentTime+i);
+            o.stop(ctx.currentTime+i+.65);
         }
     }catch(e){}
+
     let t=10; timerEl.textContent=t;
     clearInterval(panicInterval);
-    panicInterval=setInterval(()=>{ t--; timerEl.textContent=t; if(t<=0){ clearInterval(panicInterval); overlay.classList.remove('active'); } },1000);
+    panicInterval=setInterval(()=>{
+        t--;
+        timerEl.textContent=t;
+        if(t<=0){ clearInterval(panicInterval); overlay.classList.remove('active'); }
+    },1000);
 });
 
 socket.on('panicTwist', (twist)=>{
-    const card=document.getElementById('twistCard'), txt=document.getElementById('twistText');
+    const card=document.getElementById('twistCard');
+    const txt=document.getElementById('twistText');
     card.style.display='block';
-    const safeTwist=twist.replace(/'/g,"\\'").replace(/"/g,"&quot;");
-    txt.innerHTML='<span style="font-size:1.1em">'+twist+'</span><br><button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist(\''+safeTwist+'\')">إرسال التويست للاعبين 📢</button>';
-    showToast('🌀 Plot Twist تم توليده!',3000);
+    
+    const safeTwist = twist.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+    txt.innerHTML = '<span style="font-size:1.1em">'+twist+'</span><br><button class="btn-danger btn-sm" style="margin-top:12px" id="shareTwistBtn" onclick="sharePlotTwist(\''+safeTwist+'\')">إرسال التويست للاعبين 📢</button>';
+    showToast('🌀 Plot Twist تم توليده!', 3000);
 });
 
-function sharePlotTwist(twistText){
-    socket.emit('shareTwist',{roomCode:myCode,twist:twistText});
-    document.getElementById('shareTwistBtn').disabled=true;
-    document.getElementById('shareTwistBtn').textContent='تم الإرسال ✔️';
-    showToast('✅ تم إرسال الحدث المفاجئ!',3000);
+function sharePlotTwist(twistText) {
+    socket.emit('shareTwist', { roomCode: myCode, twist: twistText });
+    document.getElementById('shareTwistBtn').disabled = true;
+    document.getElementById('shareTwistBtn').textContent = 'تم الإرسال ✔️';
+    showToast('✅ تم إرسال الحدث المفاجئ للاعبين!', 3000);
 }
 
 // ════════════════════════════════════════════════
-//  Execution
+//  Execution Result
 // ════════════════════════════════════════════════
-function confirmExecution(){ if(confirm('هل أنت متأكد من تنفيذ الإعدام؟')) socket.emit('executePlayer',myCode); }
+function confirmExecution(){
+    if(confirm('هل أنت متأكد من تنفيذ الإعدام؟')){
+        socket.emit('executePlayer', myCode);
+    }
+}
 
 socket.on('executionResult', (d)=>{
     const overlay=document.getElementById('resultOverlay');
@@ -851,19 +957,17 @@ socket.on('executionResult', (d)=>{
     document.getElementById('resultMsg').textContent=d.message;
     overlay.classList.add('active');
     if(d.gameOver) document.querySelector('#resultOverlay button').textContent='ممتاز!';
-    // Reset vote button
-    const btn=document.getElementById('btnStartVote');
-    if(btn){ btn.disabled=false; btn.innerText='بدء التصويت 🗳️'; }
-    document.getElementById('vStats').innerHTML='<p style="color:#555">لا يوجد أصوات بعد</p>';
 });
 
-function closeResult(){ document.getElementById('resultOverlay').classList.remove('active'); }
+function closeResult(){
+    document.getElementById('resultOverlay').classList.remove('active');
+}
 
 // ════════════════════════════════════════════════
 //  Game Over
 // ════════════════════════════════════════════════
 socket.on('gameOver', (msg)=>{
-    SS.clear(); leaveVoice(); showMic(false); stopTimer();
+    SS.clear();
     const overlay=document.getElementById('resultOverlay');
     document.getElementById('resultIcon').textContent=msg.includes('انتصرت')?'🏆':'💀';
     document.getElementById('resultMsg').innerHTML=msg+'<br><br><button onclick="location.reload()" style="width:auto;padding:10px 24px">العب تاني 🔄</button>';
@@ -872,69 +976,115 @@ socket.on('gameOver', (msg)=>{
 });
 
 // ════════════════════════════════════════════════
-//  Close Room
+//  Close Room (Boss)
 // ════════════════════════════════════════════════
 function closeRoom(){
-    if(confirm('هل تريد إغلاق الغرفة؟')){ socket.emit('closeRoom',myCode); SS.clear(); leaveVoice(); location.reload(); }
+    if(confirm('هل تريد إغلاق الغرفة؟ سيخرج كل اللاعبين.')){
+        socket.emit('closeRoom', myCode);
+        SS.clear();
+        location.reload();
+    }
 }
 
-function startVotingPhase(){
-    socket.emit('startVotingPhase',myCode);
-    document.getElementById('btnStartVote').disabled=true;
-    document.getElementById('btnStartVote').innerText='جاري التصويت...';
-    handlePhaseForMic('voting');
+function startVotingPhase() {
+    socket.emit('startVotingPhase', myCode);
+    document.getElementById('btnStartVote').disabled = true;
+    document.getElementById('btnStartVote').innerText = "جاري التصويت...";
 }
 
-socket.on('votingStarted', ()=>{ showToast('تم فتح باب التصويت!',3000); handlePhaseForMic('voting'); });
+socket.on('votingStarted', () => {
+    showToast('تم فتح باب التصويت للاعبين!', 3000);
+});
 
-// ════════════════════════════════════════════════
-//  Phase Timer (from server)
-// ════════════════════════════════════════════════
-socket.on('phaseTimer', (d)=>{
-    handlePhaseForMic(d.phase || 'discussion');
-    startTimer(d.seconds, d.label, ()=>{
-        if(d.phase==='voting') showToast('⏰ انتهى وقت التصويت!');
+socket.on('executionResult', () => {
+    const btn = document.getElementById('btnStartVote');
+    if(btn) {
+        btn.disabled = false;
+        btn.innerText = "بدء التصويت 🗳️";
+    }
+    document.getElementById('vStats').innerHTML = '<p style="color:#555">لا يوجد أصوات بعد</p>';
+});
+
+socket.on('phaseTimer', (d) => {
+    startTimer(d.seconds, d.label, () => {
+        if(d.phase === 'voting') {
+            showToast('⏰ انتهى وقت التصويت!');
+        }
     });
 });
 
-socket.on('timerExpired', (d)=>{
+socket.on('timerExpired', (d) => {
     stopTimer();
-    if(d.autoExecute && isBoss){ showToast('⏰ الوقت خلص! جاري تنفيذ الإعدام تلقائياً...'); setTimeout(()=>confirmExecution(),2000); }
+    if(d.autoExecute && isBoss) {
+        showToast('⏰ الوقت خلص! جاري تنفيذ الإعدام تلقائياً...');
+        setTimeout(() => confirmExecution(), 2000);
+    }
 });
 
 // ════════════════════════════════════════════════
-//  Auto-fill & Init
+//  Auto-fill code from URL
 // ════════════════════════════════════════════════
 window.addEventListener('load', ()=>{
     const code=new URLSearchParams(location.search).get('code');
-    if(code) document.getElementById('roomCodeInput').value=code.toUpperCase();
+    if(code){
+        document.getElementById('roomCodeInput').value=code.toUpperCase();
+    }
+    // نشوف لو فيه session قديمة
     const sess=SS.load();
-    if(!sess.code||!sess._connected) show('screen-home');
+    if(!sess.code) {
+        show('screen-home');
+    } else if(!sess._connected) {
+        show('screen-home');
+    }
+    // لو فيه session هيتعالج في socket.on('connect')
 });
 
 // ════════════════════════════════════════════════
 //  Helpers
 // ════════════════════════════════════════════════
-function show(id){ document.querySelectorAll('.screen').forEach(s=>s.style.display='none'); const el=document.getElementById(id); if(el) el.style.display='block'; }
-function showToast(msg,dur=3000){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',dur); }
-
-function selectGame(type){
-    if(type==='classic'){ window.location.href='/mafia-classic.html'; return; }
-    if(type==='impostor'){ window.location.href='/impostor.html'; return; }
-    document.getElementById('game-select-view').style.display='none';
-    document.getElementById('mafioso-join-view').style.display='block';
+function show(id){
+    document.querySelectorAll('.screen').forEach(s=>s.style.display='none');
+    const el=document.getElementById(id);
+    if(el) el.style.display='block';
 }
 
-function backToGameSelect(){
-    document.getElementById('game-select-view').style.display='block';
-    document.getElementById('mafioso-join-view').style.display='none';
+function showToast(msg, dur=3000){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.style.display='block';
+    clearTimeout(t._t);
+    t._t=setTimeout(()=>{ t.style.display='none'; }, dur);
 }
 
-async function shareRoom(){
-    const url=window.location.origin+'?code='+myCode;
-    const text='انضم لجيم المافيا! كود الغرفة: '+myCode+'\n'+url;
-    if(navigator.share){ try{await navigator.share({title:'Mafioso Trial 🕵️',text,url});}catch(e){} }
-    else navigator.clipboard.writeText(text).then(()=>showToast('✅ تم نسخ الرابط!',3000));
+function selectGame(type) {
+    if (type === 'classic') {
+        window.location.href = '/mafia-classic.html';
+        return;
+    }
+    if (type === 'impostor') {
+        window.location.href = '/impostor.html';
+        return;
+    }
+    // mafioso
+    document.getElementById('game-select-view').style.display = 'none';
+    document.getElementById('mafioso-join-view').style.display = 'block';
+}
+
+function backToGameSelect() {
+    document.getElementById('game-select-view').style.display = 'block';
+    document.getElementById('mafioso-join-view').style.display = 'none';
+}
+
+async function shareRoom() {
+    const url = window.location.origin + '?code=' + myCode;
+    const text = 'انضم لجيم المافيا! كود الغرفة: '+myCode+'\n'+url;
+    
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: 'Mafioso Trial 🕵️', text: text, url: url });
+        } catch(e) {}
+    } else {
+        navigator.clipboard.writeText(text).then(() => showToast('✅ تم نسخ الرابط!', 3000));
+    }
 }
 </script>
 </body>

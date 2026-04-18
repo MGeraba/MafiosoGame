@@ -51,24 +51,10 @@ input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radiu
 /* ── Role Reveal (improved) ── */
 .role-card{position:relative;background:#111;border-radius:12px;padding:16px;margin:10px 0;cursor:pointer;user-select:none;transition:.3s;overflow:hidden;border:2px dashed #333}
 .role-card:hover{border-color:#555}
-.role-card.hidden .role-real{filter:blur(8px);opacity:.3;transition:.3s}
-.role-card.hidden .role-hint{display:none}
+.role-card.hidden .role-real{filter:blur(12px);opacity:0;transition:.3s;pointer-events:none;user-select:none}
 .role-card.hidden::after{content:'👁️ اضغط لكشف دورك';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1em;color:#888;background:rgba(0,0,0,.4);border-radius:10px}
 .role-card.revealed .role-real{filter:none;opacity:1;transition:.3s}
-.role-card.revealed .role-hint{display:block}
 .role-real{font-size:1.8em;font-weight:bold;padding:8px 0;transition:.3s}
-/* ── Timer ── */
-.timer-container{background:#111;border:1px solid #333;border-radius:10px;padding:10px 14px;margin:8px 0;display:none}
-.timer-container.active{display:block}
-.timer-bar-wrap{background:#222;border-radius:6px;height:8px;overflow:hidden;margin-top:6px}
-.timer-bar{height:100%;border-radius:6px;transition:width .5s linear;background:linear-gradient(90deg,#28a745,#d4af37)}
-.timer-bar.warning{background:linear-gradient(90deg,#e67e22,#dc3545)}
-.timer-bar.danger{background:#dc3545}
-.timer-text{display:flex;justify-content:space-between;align-items:center;font-size:.85em;color:#aaa}
-.timer-text .timer-seconds{font-size:1.4em;font-weight:bold;color:#d4af37;font-variant-numeric:tabular-nums}
-.timer-text .timer-phase-label{color:#888;font-size:.8em}
-@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.4}}
-.timer-seconds.critical{color:#dc3545;animation:timerPulse .5s infinite}
 /* ── Chat ── */
 #chatBox{position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(10,10,10,.97);border-top:2px solid #d4af37;transition:.3s;max-height:55vh;display:flex;flex-direction:column}
 #chatBox.collapsed{max-height:44px}
@@ -85,8 +71,23 @@ input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radiu
 .lobby-room-card:hover{border-color:#d4af37}
 /* ── join request badge ── */
 .join-req{background:#1a1a2e;border:1px solid #4444ff;border-radius:8px;padding:8px 12px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;font-size:.9em}
-/* ── Who voted indicator ── */
-.voted-indicator{display:inline-block;background:#1a2e1a;color:#28a745;font-size:.7em;padding:2px 6px;border-radius:4px;margin-right:4px}
+/* ── Phase Timer ── */
+#phaseTimerBar{display:none;margin:8px 0}
+.timer-wrap{background:#1a1a1a;border-radius:8px;padding:8px 12px;border:1px solid #333}
+.timer-label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right}
+.timer-track{height:6px;background:#333;border-radius:3px;overflow:hidden}
+.timer-fill{height:100%;border-radius:3px;transition:width 1s linear}
+.timer-fill.green{background:#28a745}
+.timer-fill.yellow{background:#ffc107}
+.timer-fill.red{background:#dc3545}
+.timer-secs{font-size:1.4em;font-weight:bold;color:#d4af37;margin-top:4px}
+/* ── Voice bar ── */
+#voiceChatBar{position:fixed;bottom:44px;left:0;width:100%;background:rgba(10,10,10,.98);padding:8px;border-top:1px solid #333;z-index:490;text-align:center;display:none}
+#voiceChatBar.show{display:block}
+/* fix role card — no text leaking */
+.role-card.hidden .role-real{visibility:hidden}
+.role-card.hidden::after{content:'👁️ اضغط لكشف دورك'}
+.role-card.revealed .role-real{visibility:visible}
 </style>
 </head>
 <body>
@@ -170,16 +171,6 @@ input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radiu
 <!-- ══ BOSS GAME ══ -->
 <div id="screen-boss-game" class="screen">
   <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
-  <!-- Timer for Boss -->
-  <div class="timer-container" id="bossTimerContainer">
-    <div class="timer-text">
-      <span class="timer-phase-label" id="bossTimerLabel">⏳ المرحلة</span>
-      <span class="timer-seconds" id="bossTimerSeconds">--</span>
-    </div>
-    <div class="timer-bar-wrap">
-      <div class="timer-bar" id="bossTimerBar" style="width:100%"></div>
-    </div>
-  </div>
   <div class="card">
     <h4 style="color:#00ffcc;margin-bottom:8px">🎭 الأدوار الحقيقية</h4>
     <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:2"></div>
@@ -215,18 +206,25 @@ input{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radiu
   </div>
 </div>
 
+
+<!-- ══ PHASE TIMER ══ -->
+<div id="phaseTimerBar" style="display:none;margin:8px auto;max-width:500px;padding:0 10px">
+  <div class="timer-wrap">
+    <div class="timer-label" id="timerLabel">⏱️ وقت المرحلة</div>
+    <div class="timer-track"><div class="timer-fill green" id="timerFill" style="width:100%"></div></div>
+    <div class="timer-secs" id="timerSecs">--</div>
+  </div>
+</div>
+
+<!-- ══ VOICE BAR ══ -->
+<div id="voiceChatBar" style="position:fixed;bottom:44px;left:0;width:100%;background:rgba(10,10,10,.98);padding:8px;border-top:1px solid #333;z-index:490;text-align:center;display:none">
+  <span style="color:gold;font-weight:bold;margin-left:10px;vertical-align:middle">🎙️ الصوت:</span>
+  <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745;color:#fff;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">تشغيل المايك</button>
+  <button id="muteBtn" onclick="toggleMute()" style="display:none;background:#ffc107;color:#000;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">كتم 🔇</button>
+  <div id="audioPlayers" style="display:none"></div>
+</div>
 <!-- ══ PLAYER GAME ══ -->
 <div id="screen-player-game" class="screen">
-  <!-- Timer for Player -->
-  <div class="timer-container" id="playerTimerContainer">
-    <div class="timer-text">
-      <span class="timer-phase-label" id="playerTimerLabel">⏳ المرحلة</span>
-      <span class="timer-seconds" id="playerTimerSeconds">--</span>
-    </div>
-    <div class="timer-bar-wrap">
-      <div class="timer-bar" id="playerTimerBar" style="width:100%"></div>
-    </div>
-  </div>
   <div id="playerContent"></div>
   <div id="actionSection" style="display:none" class="card">
     <h3 id="actionTitle" style="margin-bottom:10px;color:#d4af37"></h3>
@@ -260,84 +258,6 @@ const socket = io({ reconnection:true, reconnectionAttempts:Infinity, reconnecti
 let myCode='', myName='', isBoss=false, myRole='', hasActed=false;
 let chatOpen=false, chatUnreadCount=0, currentRoomCode='';
 
-// ══ Timer System ══
-const TimerManager = {
-  _interval: null,
-  _remaining: 0,
-  _total: 0,
-  _currentPhase: '',
-
-  phaseLabels: {
-    night_mafia: '🌙 المافيا تختار',
-    night_doctor: '💉 دور الدكتور',
-    discussion: '💬 وقت النقاش',
-    day: '🗳️ وقت التصويت',
-    voting: '🗳️ وقت التصويت'
-  },
-
-  start(seconds, phase) {
-    this.stop();
-    this._remaining = seconds;
-    this._total = seconds;
-    this._currentPhase = phase;
-    this._updateUI();
-    this._showContainers(true);
-
-    this._interval = setInterval(() => {
-      this._remaining = Math.max(0, this._remaining - 1);
-      this._updateUI();
-      if (this._remaining <= 0) this.stop();
-    }, 1000);
-  },
-
-  update(seconds) {
-    this._remaining = seconds;
-    this._updateUI();
-  },
-
-  stop() {
-    if (this._interval) { clearInterval(this._interval); this._interval = null; }
-  },
-
-  hide() {
-    this.stop();
-    this._showContainers(false);
-  },
-
-  _showContainers(show) {
-    const boss = document.getElementById('bossTimerContainer');
-    const player = document.getElementById('playerTimerContainer');
-    if (boss) boss.classList.toggle('active', show);
-    if (player) player.classList.toggle('active', show);
-  },
-
-  _updateUI() {
-    const pct = this._total > 0 ? (this._remaining / this._total) * 100 : 0;
-    const label = this.phaseLabels[this._currentPhase] || '⏳ جاري...';
-    const isCritical = this._remaining <= 5;
-    const isWarning = this._remaining <= 10;
-
-    // Update both boss and player timer UIs
-    ['boss', 'player'].forEach(prefix => {
-      const seconds = document.getElementById(prefix + 'TimerSeconds');
-      const bar = document.getElementById(prefix + 'TimerBar');
-      const lbl = document.getElementById(prefix + 'TimerLabel');
-
-      if (seconds) {
-        seconds.textContent = this._remaining + 'ث';
-        seconds.classList.toggle('critical', isCritical);
-      }
-      if (bar) {
-        bar.style.width = pct + '%';
-        bar.classList.remove('warning', 'danger');
-        if (isCritical) bar.classList.add('danger');
-        else if (isWarning) bar.classList.add('warning');
-      }
-      if (lbl) lbl.textContent = label;
-    });
-  }
-};
-
 const SS = {
   save(d){ try{localStorage.setItem('mfc2',JSON.stringify(d))}catch(e){} },
   load(){ try{return JSON.parse(localStorage.getItem('mfc2')||'{}')}catch(e){return{}} },
@@ -361,41 +281,9 @@ socket.on('connect',()=>{
   }
 });
 
-socket.on('roomEnded',()=>{ SS.clear(); TimerManager.hide(); showToast('الغرفة أُغلقت',3000); setTimeout(()=>location.reload(),2000); });
+socket.on('roomEnded',()=>{ SS.clear(); showToast('الغرفة أُغلقت',3000); setTimeout(()=>location.reload(),2000); });
 socket.on('mcLeftRoom',()=>{ SS.clear(); location.reload(); });
 socket.on('error',(m)=>{ showToast('⚠️ '+m,4000); const b=document.getElementById('startBtn'); if(b){b.disabled=false;b.textContent='ابدأ الليلة 🌙';} });
-
-// ══ Phase Timer Events (from server) ══
-socket.on('mcPhaseTimer', (d) => {
-  // d = { phase, remaining, total }
-  if (d.total && d.remaining === d.total) {
-    TimerManager.start(d.total, d.phase);
-  } else {
-    TimerManager.update(d.remaining);
-  }
-});
-
-socket.on('mcPhaseChange', (d) => {
-  // d = { phase, duration }
-  if (d.duration) {
-    TimerManager.start(d.duration, d.phase);
-  }
-  // Update boss phase UI if boss
-  if (isBoss) {
-    setBossPhase(d.phase);
-  }
-  // Show phase announcement to players
-  const phaseNames = {
-    night_mafia: '🌙 ليلة المافيا',
-    night_doctor: '💉 دور الدكتور',
-    discussion: '💬 وقت النقاش',
-    day: '🗳️ وقت التصويت',
-    voting: '🗳️ وقت التصويت'
-  };
-  if (phaseNames[d.phase]) {
-    showToast(phaseNames[d.phase], 3000);
-  }
-});
 
 // ══ Lobby List ══
 socket.on('mcLobbyList', renderLobbyList);
@@ -441,7 +329,7 @@ function initBossLobby(c){
 
 socket.on('mcBossReconnected',(d)=>{
   initBossLobby(myCode);
-  if(d.started){ show('screen-boss-game'); if(d.roomData){ renderBossSecrets(d.roomData.players); setBossPhase(d.roomData.phase); } }
+  if(d.started){ show('screen-boss-game'); if(d.roomData) renderBossSecrets(d.roomData.players); }
   else { show('screen-boss-lobby'); if(d.players) updatePlayerList(d.players); }
 });
 
@@ -492,7 +380,6 @@ function approveJoin(id, approve) {
 function leaveRoom(){
   socket.emit('mcLeaveRoom',{roomCode:myCode});
   SS.clear();
-  TimerManager.hide();
 }
 
 // ══ Start Game ══
@@ -505,6 +392,7 @@ function startGame(){
 // ══ Boss Game ══
 socket.on('mcBossData',(d)=>{
   show('screen-boss-game');
+  document.getElementById('voiceChatBar').style.display='block';
   renderBossSecrets(d.players);
   updateBossAliveList(d.players);
   setBossPhase('night_mafia');
@@ -540,12 +428,8 @@ function setBossPhase(phase){
     document.getElementById('nightMafiaSection').style.display='block';
     document.getElementById('nightDoctorSection').style.display='block';
     document.getElementById('btnRevealNight').style.display='inline-block';
-  } else if(phase==='discussion'){
-    banner.textContent='💬 النهار — وقت النقاش';
-    document.getElementById('dayVoteSection').style.display='block';
-    document.getElementById('btnStartVote').style.display='inline-block';
-  } else if(phase==='day' || phase==='voting'){
-    banner.textContent='☀️ النهار — التصويت';
+  } else if(phase==='day'){
+    banner.textContent='☀️ النهار — النقاش والتصويت';
     document.getElementById('dayVoteSection').style.display='block';
     document.getElementById('btnStartVote').style.display='inline-block';
     document.getElementById('btnExecute').style.display='inline-block';
@@ -574,7 +458,7 @@ function revealNightResult(){
 socket.on('mcNightResult',(d)=>{
   renderBossSecrets(d.players);
   updateBossAliveList(d.players);
-  setBossPhase(d.phase || 'discussion');
+  setBossPhase('day');
   const icon = d.saved?'💉':d.killed?'💀':'🌅';
   const msg  = d.saved?`💉 الدكتور أنقذ ${d.targetName}! لا أحد مات الليلة.`
              : d.killed?`💀 ${d.targetName} وُجد ميتاً الصباح!`
@@ -588,10 +472,6 @@ function startVotingPhase(){
   document.getElementById('btnStartVote').textContent='جاري...';
   showToast('✅ تم فتح التصويت!',3000);
 }
-
-socket.on('votingStarted',()=>{
-  setBossPhase('voting');
-});
 
 socket.on('mcVoteUpdate',(d)=>{
   let s='';
@@ -607,7 +487,6 @@ function confirmExecution(){
 socket.on('mcExecutionResult',(d)=>{
   renderBossSecrets(d.players);
   updateBossAliveList(d.players);
-  TimerManager.hide();
   const icon=d.isMafia?'🎯':d.isDoctor?'💉':'😢';
   const msg=d.isMafia?`✅ ${d.charName} كان مافيا! متبقي ${d.remaining} مافيا.`
            :d.isDoctor?`💉 ${d.charName} كان الدكتور! خسرت المدينة حصنها!`
@@ -620,12 +499,10 @@ socket.on('mcExecutionResult',(d)=>{
 
 socket.on('mcGameOver',(d)=>{
   SS.clear();
-  TimerManager.hide();
   showResult(d.winner==='civilians'?'🏆':'💀', d.message+'\n\n'+d.details, true, d.winner);
 });
 
 socket.on('mcBackToLobby',(d)=>{
-  TimerManager.hide();
   show('screen-boss-lobby');
   if(d.players) updatePlayerList(d.players);
   showToast('🔄 رجعنا للـ Lobby!',3000);
@@ -634,6 +511,7 @@ socket.on('mcBackToLobby',(d)=>{
 // ══ Player Game ══
 socket.on('mcGameData',(d)=>{
   myRole=d.role;
+  document.getElementById('voiceChatBar').style.display='block';
   SS.save({...SS.load(), gameData:d, isAlive:d.isAlive});
   renderPlayerScreen(d);
 });
@@ -660,7 +538,7 @@ function renderPlayerScreen(d){
       <p style="color:#888;font-size:.8em;margin-bottom:6px">اضغط على الكرت لكشف / إخفاء دورك</p>
       <div class="role-card hidden" onclick="toggleRole(this)" id="roleCard">
         <div class="role-real ${roleClass}" id="roleText">${roleIcon}</div>
-        <p class="role-hint" style="color:#555;font-size:.75em;margin-top:4px">دورك السري</p>
+        <p style="color:#555;font-size:.75em;margin-top:4px">دورك السري</p>
       </div>
       <button class="btn-gray btn-sm" style="margin-top:10px" onclick="leaveRoom()">مغادرة 🚪</button>
     </div>`;
@@ -684,6 +562,7 @@ socket.on('mcNightAction',(d)=>{
   const btns=document.getElementById('actionBtns');
   sec.style.display='block';
 
+  if(d.timer) startTimer(d.type==='mafia_kill'?'🔪 اختار ضحيتك':'💉 اختر من تنقذ', d.timer);
   if(d.type==='mafia_kill'){
     title.textContent='🔪 اختار ضحيتك الليلة:';
     title.style.color='#ff4d4d';
@@ -719,6 +598,7 @@ socket.on('mcStartDayVoting',(d)=>{
   hasActed=false;
   const sec=document.getElementById('actionSection');
   sec.style.display='block';
+  if(d.timer) startTimer('🗳️ وقت التصويت', d.timer);
   document.getElementById('actionTitle').textContent='🗳️ صوّت على من تظنه مافيا:';
   document.getElementById('actionTitle').style.color='#d4af37';
   const btns=document.getElementById('actionBtns');
@@ -729,6 +609,7 @@ socket.on('mcStartDayVoting',(d)=>{
     btn.onclick=()=>{
       if(hasActed) return; hasActed=true;
       socket.emit('mcCastVote',{roomCode:myCode,target:t});
+      stopTimer();
       btns.querySelectorAll('.vote-btn').forEach(b=>b.disabled=true);
       btn.classList.add('selected'); btn.textContent+=' ✓';
       showToast('✅ تم إرسال صوتك!',3000);
@@ -742,14 +623,12 @@ socket.on('mcRoundAnnounce',(d)=>{ showToast(d.message, 6000); });
 socket.on('mcGameOver',(d)=>{
   if(!isBoss){
     SS.clear();
-    TimerManager.hide();
     showResult(d.winner==='civilians'?'🏆':'💀', d.message+'\n\n'+d.details, true, d.winner);
   }
 });
 
 socket.on('mcBackToLobby',(d)=>{
   if(!isBoss){
-    TimerManager.hide();
     show('screen-wait');
     document.getElementById('wait-name').textContent='انتظر البوس يبدأ جيم جديد...';
     showToast('🔄 البوس بيبدأ جيم جديد!',3000);
@@ -790,19 +669,26 @@ async function shareQRImage(){
   const W=320, H=400;
   canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d');
+  // خلفية
   ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,W,H);
+  // إطار
   ctx.strokeStyle='#d4af37'; ctx.lineWidth=3;
   ctx.strokeRect(6,6,W-12,H-12);
+  // عنوان
   ctx.fillStyle='#d4af37'; ctx.font='bold 22px Segoe UI';
   ctx.textAlign='center'; ctx.fillText('🌙 المافيا الكلاسيك',W/2,46);
+  // QR
   const qrSize=200;
   const qrX=(W-qrSize)/2;
   ctx.fillStyle='#fff'; ctx.fillRect(qrX-8, 58, qrSize+16, qrSize+16);
   ctx.drawImage(qrCanvas, qrX, 66, qrSize, qrSize);
+  // كود
   ctx.fillStyle='#fff'; ctx.font='bold 28px monospace';
   ctx.letterSpacing='8px'; ctx.fillText(myCode, W/2, 308);
+  // رابط
   ctx.fillStyle='#888'; ctx.font='13px Segoe UI'; ctx.letterSpacing='0';
   ctx.fillText(url.length>40?url.substring(0,40)+'...':url, W/2, 336);
+  // نص
   ctx.fillStyle='#555'; ctx.font='12px Segoe UI';
   ctx.fillText('امسح الـ QR أو استخدم الكود للانضمام',W/2,365);
 
@@ -812,6 +698,7 @@ async function shareQRImage(){
     if(navigator.canShare && navigator.canShare({files:[file]})){
       try{ await navigator.share({title:'المافيا الكلاسيك 🌙', text:shareText, files:[file]}); return; }catch(e){}
     }
+    // fallback: download
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download='mafia-room-'+myCode+'.png'; a.click();
     showToast('✅ تم تحميل الصورة!',3000);
@@ -849,7 +736,7 @@ function showResult(icon, msg, isOver, winner){
   document.getElementById('resultOverlay').classList.add('active');
 }
 
-function closeRoom(){ if(confirm('إغلاق الغرفة؟')){ socket.emit('mcCloseRoom',myCode); SS.clear(); TimerManager.hide(); location.reload(); } }
+function closeRoom(){ if(confirm('إغلاق الغرفة؟')){ socket.emit('mcCloseRoom',myCode); SS.clear(); location.reload(); } }
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.style.display='none'); const el=document.getElementById(id); if(el) el.style.display='block'; }
 function showToast(msg,dur=3000){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',dur); }
 
@@ -859,6 +746,108 @@ window.addEventListener('load',()=>{
   const s=SS.load();
   if(!s.code||!s._connected){ show('screen-home'); socket.emit('mcGetLobbyList'); }
 });
+
+// ══ Phase Timer ══
+let timerInterval = null;
+socket.on('mcPhaseTimer', ({ phase, seconds }) => {
+  const labels = {
+    night_mafia: '🔪 المافيا تختار ضحيتها',
+    night_doctor: '💉 الدكتور يقرر',
+    discussion: '☀️ وقت النقاش',
+    voting: '🗳️ وقت التصويت'
+  };
+  startTimer(labels[phase] || phase, seconds);
+});
+socket.on('mcTimerExpired', (d) => {
+  stopTimer();
+  if (d.phase === 'voting' && d.autoExecute && isBoss) {
+    showToast('⏰ انتهى وقت التصويت — سيتم تنفيذ الإعدام تلقائياً!', 4000);
+    setTimeout(() => socket.emit('mcExecute', myCode), 1500);
+  } else {
+    showToast('⏰ انتهى الوقت!', 3000);
+  }
+});
+
+function startTimer(label, seconds) {
+  stopTimer();
+  const bar = document.getElementById('phaseTimerBar');
+  const lbl = document.getElementById('timerLabel');
+  const fill = document.getElementById('timerFill');
+  const secs = document.getElementById('timerSecs');
+  bar.style.display = 'block';
+  lbl.textContent = label;
+  const total = seconds;
+  let left = seconds;
+  function tick() {
+    secs.textContent = left + 's';
+    const pct = (left / total) * 100;
+    fill.style.width = pct + '%';
+    fill.className = 'timer-fill ' + (pct > 50 ? 'green' : pct > 20 ? 'yellow' : 'red');
+    if (left <= 0) { stopTimer(); return; }
+    left--;
+  }
+  tick();
+  timerInterval = setInterval(tick, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  const bar = document.getElementById('phaseTimerBar');
+  if (bar) bar.style.display = 'none';
+}
+
+// ══ WebRTC Voice ══
+let localStream; let peers = {};
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+async function initVoiceChat() {
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+    showToast('⚠️ المايك يحتاج HTTPS', 4000); return;
+  }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    document.getElementById('joinVoiceBtn').style.display = 'none';
+    document.getElementById('muteBtn').style.display = 'inline-block';
+    socket.emit('joinVoice', myCode);
+    showToast('🎙️ المايك شغال!', 3000);
+  } catch(e) {
+    showToast('❌ تعذر الوصول للمايك. تأكد من الصلاحية.', 4000);
+  }
+}
+
+function toggleMute() {
+  if (!localStream) return;
+  const track = localStream.getAudioTracks()[0];
+  track.enabled = !track.enabled;
+  document.getElementById('muteBtn').textContent = track.enabled ? 'كتم 🔇' : 'فتح 🔊';
+}
+
+socket.on('user-joined-voice', (userId) => { if (localStream) createPeer(userId, true); });
+socket.on('webrtc-offer', async (data) => {
+  if (!localStream) return;
+  const peer = createPeer(data.sender, false);
+  await peer.setRemoteDescription(new RTCSessionDescription(data.sdp));
+  const answer = await peer.createAnswer();
+  await peer.setLocalDescription(answer);
+  socket.emit('webrtc-answer', { target: data.sender, sdp: answer });
+});
+socket.on('webrtc-answer', (data) => { if (peers[data.sender]) peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.sdp)); });
+socket.on('webrtc-ice-candidate', (data) => { if (peers[data.sender]) peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate)); });
+
+function createPeer(targetId, initiator) {
+  const peer = new RTCPeerConnection(rtcConfig);
+  peers[targetId] = peer;
+  if(localStream) localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
+  peer.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
+  peer.ontrack = e => {
+    let aud = document.createElement('audio');
+    aud.autoplay = true; aud.srcObject = e.streams[0];
+    document.getElementById('audioPlayers').appendChild(aud);
+  };
+  if (initiator) peer.createOffer().then(o => { peer.setLocalDescription(o); socket.emit('webrtc-offer', { target: targetId, sdp: o }); });
+  return peer;
+}
+
 </script>
 </body>
 </html>

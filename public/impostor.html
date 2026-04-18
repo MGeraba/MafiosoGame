@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>الإمبوستر 🕵️</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;padding:10px;overflow-x:hidden;min-height:100vh;padding-bottom:80px}
+h1{color:#d4af37;letter-spacing:2px;margin:20px 0 10px}
+.card{background:#151515;border:1px solid #d4af37;padding:15px;border-radius:12px;margin:10px auto;max-width:500px;box-shadow:0 4px 15px rgba(212,175,55,.1)}
+button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px;width:90%;font-size:16px;transition:.2s}
+button:active{transform:scale(.95)}
+button:disabled{opacity:.5;cursor:not-allowed}
+input,select{background:#222;color:#fff;border:1px solid #444;padding:12px;border-radius:8px;width:90%;margin:8px 0;font-size:16px}
+select option{background:#222}
+.screen{display:none}
+.player-tag{display:inline-block;background:#222;padding:8px 14px;border-radius:20px;margin:4px;font-size:14px;color:#00ffcc;border:1px solid #00ffcc}
+.loader{border:4px solid #333;border-top:4px solid #d4af37;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+#conn-bar{position:fixed;top:0;left:0;right:0;padding:7px;font-size:13px;text-align:center;z-index:9999;display:none}
+#conn-bar.offline{background:#c0392b;display:block}
+#conn-bar.online{background:#27ae60;display:block;animation:fadeBar 2s 1.5s forwards}
+@keyframes fadeBar{to{opacity:0;pointer-events:none}}
+#resultOverlay{display:none;position:fixed;inset:0;z-index:8000;align-items:center;justify-content:center;flex-direction:column;padding:20px;background:rgba(0,0,0,.92)}
+#resultOverlay.active{display:flex}
+.result-box{background:#151515;border:2px solid #d4af37;border-radius:16px;padding:24px;max-width:440px;width:100%}
+.result-icon{font-size:3.5em;margin-bottom:8px}
+.result-msg{font-size:.95em;line-height:1.8;margin-bottom:16px;color:#eee;text-align:right;white-space:pre-line}
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a1a;border:1px solid #d4af37;color:#fff;padding:10px 20px;border-radius:10px;z-index:9999;max-width:90%;font-size:14px;display:none;text-align:center}
+.sep{border:none;border-top:1px solid #2a2a2a;margin:10px 0}
+.label{font-size:.8em;color:#888;margin-bottom:4px;text-align:right;display:block}
+.spy-badge{color:#ff6b35;font-weight:bold}
+.normal-badge{color:#00ffcc;font-weight:bold}
+.btn-danger{background:#dc3545!important;color:#fff!important}
+.btn-green{background:#28a745!important;color:#fff!important}
+.btn-blue{background:#17a2b8!important;color:#fff!important}
+.btn-orange{background:#e67e22!important;color:#fff!important}
+.btn-gray{background:#444!important;color:#fff!important}
+.btn-sm{width:auto!important;padding:8px 14px!important;font-size:14px!important}
+#qrcode{margin:10px auto;display:flex;justify-content:center}
+#qrcode img,#qrcode canvas{border-radius:8px;border:3px solid #d4af37;background:#fff;padding:6px}
+/* Role Card */
+.role-card{position:relative;background:#111;border-radius:12px;padding:16px;margin:10px 0;cursor:pointer;user-select:none;transition:.3s;overflow:hidden;border:2px dashed #333}
+.role-card:hover{border-color:#555}
+.role-card.hidden .role-real{filter:blur(12px);opacity:0;pointer-events:none;user-select:none}
+.role-card.hidden::after{content:'👁️ اضغط لكشف دورك';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1em;color:#888;background:rgba(0,0,0,.4);border-radius:10px}
+.role-card.revealed .role-real{filter:none;opacity:1}
+.role-real{font-size:1.6em;font-weight:bold;padding:6px 0}
+/* Chat */
+#chatBox{position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(10,10,10,.97);border-top:2px solid #d4af37;transition:.3s;max-height:55vh;display:flex;flex-direction:column}
+#chatBox.collapsed{max-height:44px}
+#chatHeader{padding:8px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#111;flex-shrink:0}
+#chatMessages{flex:1;overflow-y:auto;padding:8px 12px;font-size:.85em;text-align:right;min-height:80px}
+.chat-msg{margin:4px 0;padding:5px 10px;border-radius:8px;background:#1a1a1a;border-right:3px solid #444;text-align:right}
+.chat-msg .chat-from{color:#d4af37;font-size:.8em;font-weight:bold}
+.chat-msg .chat-time{color:#555;font-size:.7em;margin-right:6px}
+#chatInputRow{display:flex;gap:6px;padding:8px;flex-shrink:0}
+#chatInput{flex:1;background:#222;color:#fff;border:1px solid #444;padding:8px 12px;border-radius:8px;font-size:14px}
+#chatSendBtn{background:#d4af37;color:#000;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;width:auto}
+/* Lobby */
+.lobby-room-card{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.2s}
+.lobby-room-card:hover{border-color:#d4af37}
+.join-req{background:#1a1a2e;border:1px solid #4444ff;border-radius:8px;padding:8px 12px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;font-size:.9em}
+/* Guess result */
+.guess-correct{background:#0a1a0a;border:1px solid #28a745;border-radius:8px;padding:10px;color:#7fff7f}
+.guess-close{background:#1a1500;border:1px solid #e67e22;border-radius:8px;padding:10px;color:#ffcc44}
+.guess-wrong{background:#1a0505;border:1px solid #dc3545;border-radius:8px;padding:10px;color:#ff6b6b}
+</style>
+</head>
+<body>
+<div id="conn-bar"></div>
+<div id="toast"></div>
+<div id="resultOverlay">
+  <div class="result-box">
+    <div class="result-icon" id="resultIcon">🕵️</div>
+    <div class="result-msg" id="resultMsg"></div>
+    <div id="resultBtns" style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px"></div>
+  </div>
+</div>
+
+<!-- ══ HOME ══ -->
+<div id="screen-home" class="screen">
+  <h1>🕵️ الإمبوستر</h1>
+  <div id="lobbyListSection" class="card">
+    <h3 style="color:#d4af37;margin-bottom:8px">🏠 الغرف المفتوحة</h3>
+    <div id="lobbyListEl"><p style="color:#555;font-size:.9em">جاري التحميل...</p></div>
+    <button class="btn-gray btn-sm" onclick="socket.emit('impGetLobbyList')">🔄 تحديث</button>
+  </div>
+  <div class="card">
+    <button class="btn-green" onclick="showCreateOptions()">إنشاء غرفة — أنا البوس 👑</button>
+    <div id="createOptions" style="display:none;margin-top:10px">
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;color:#aaa;font-size:.9em;margin-bottom:10px">
+        <input type="checkbox" id="isPrivate" style="width:auto;margin:0"> غرفة خاصة (مخفية)
+      </label>
+      <button class="btn-green" onclick="createRoom()">إنشاء ✅</button>
+    </div>
+    <hr class="sep">
+    <input type="text" id="playerName" placeholder="اكتب اسمك">
+    <input type="text" id="roomCodeInput" placeholder="كود الغرفة" style="letter-spacing:6px;text-transform:uppercase;text-align:center;font-size:20px" oninput="this.value=this.value.toUpperCase()">
+    <button class="btn-gray" onclick="joinRoom()">انضمام كلاعب 👤</button>
+  </div>
+  <div style="margin-top:10px"><a href="/" style="color:#888;font-size:.85em">← رجوع</a></div>
+</div>
+
+<!-- ══ WAITING ══ -->
+<div id="screen-wait" class="screen">
+  <div class="card" style="margin-top:40px">
+    <div class="loader"></div>
+    <h2 style="color:#d4af37;margin:10px 0">تم الانضمام ✅</h2>
+    <p id="wait-name" style="color:#00ffcc;font-weight:bold;font-size:1.1em"></p>
+    <p style="color:#888;margin-top:8px">انتظر البوس يبدأ الجيم...</p>
+    <button class="btn-gray btn-sm" style="margin-top:15px" onclick="leaveRoom()">مغادرة 🚪</button>
+  </div>
+</div>
+
+<!-- ══ WAITING APPROVAL ══ -->
+<div id="screen-wait-approval" class="screen">
+  <div class="card" style="margin-top:40px">
+    <div class="loader"></div>
+    <h2 style="color:#d4af37;margin:10px 0">طلب الانضمام 📨</h2>
+    <p style="color:#aaa">تم إرسال طلبك للبوس، انتظر الموافقة...</p>
+  </div>
+</div>
+
+<!-- ══ BOSS LOBBY ══ -->
+<div id="screen-boss-lobby" class="screen">
+  <h1 id="bossRoomTitle" style="margin-top:20px"></h1>
+  <div class="card">
+    <div id="qrcode"></div>
+    <div style="font-size:2em;font-weight:bold;letter-spacing:10px;color:#d4af37;margin:8px 0" id="lobbyCode"></div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:8px">
+      <button class="btn-blue btn-sm" onclick="shareQRImage()">مشاركة QR 📷</button>
+      <button class="btn-blue btn-sm" onclick="shareLink()">مشاركة رابط 🔗</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="color:#d4af37;margin-bottom:10px">إعدادات اللعبة</h3>
+    <span class="label">الفئة:</span>
+    <select id="categorySelect">
+      <option value="ai">🤖 الذكاء الاصطناعي يختار</option>
+      <option value="أماكن">📍 أماكن</option>
+      <option value="أكل ومشروبات">🍕 أكل ومشروبات</option>
+      <option value="مشاهير وممثلين">🎬 مشاهير وممثلين</option>
+      <option value="حيوانات">🐾 حيوانات</option>
+      <option value="مهن ووظائف">💼 مهن ووظائف</option>
+      <option value="رياضة">⚽ رياضة</option>
+      <option value="أفلام ومسلسلات">🎥 أفلام ومسلسلات</option>
+      <option value="تكنولوجيا وإلكترونيات">📱 تكنولوجيا</option>
+      <option value="شخصيات كرتونية">🎨 شخصيات كرتونية</option>
+      <option value="كلمات عشوائية">🎲 كلمات عشوائية</option>
+    </select>
+    <span class="label" style="margin-top:8px">عدد الجواسيس:</span>
+    <select id="spyCountSelect">
+      <option value="1">1 جاسوس</option>
+      <option value="2">2 جاسوس</option>
+    </select>
+    <hr class="sep">
+    <span class="label">اللاعبون:</span>
+    <div id="pList" style="margin:8px 0">انتظار...</div>
+    <p id="pCount" style="color:#888;font-size:.85em"></p>
+    <div id="joinRequests"></div>
+    <hr class="sep">
+    <button id="startBtn" class="btn-green" onclick="startGame()" style="display:none">ابدأ الجيم 🚀</button>
+    <button class="btn-danger btn-sm" onclick="closeRoom()">إغلاق ❌</button>
+  </div>
+</div>
+
+<!-- ══ BOSS GAME ══ -->
+<div id="screen-boss-game" class="screen">
+  <h2 style="color:#d4af37;margin:15px 0" id="bossGameTitle"></h2>
+  <div class="card">
+    <span class="label">📦 الفئة السرية:</span>
+    <div id="bossCategoryDisplay" style="background:#1a2a3a;border:1px solid #1a6a9a;border-radius:8px;padding:8px;color:#7fbfff;margin:4px auto;max-width:300px">...</div>
+    <span class="label" style="margin-top:8px">🔑 الكلمة السرية:</span>
+    <div id="bossWordDisplay" style="font-size:1.8em;font-weight:bold;color:#d4af37;margin:6px 0">...</div>
+    <div id="bossSpyCount" style="color:#ff6b35;font-size:.85em;margin:4px 0"></div>
+    <hr class="sep">
+    <h4 style="color:#00ffcc;margin-bottom:6px">👥 اللاعبون:</h4>
+    <div id="bossSecrets" style="text-align:right;font-size:.9em;line-height:2"></div>
+    <hr class="sep">
+    <h4 style="color:#7fff7f;margin-bottom:4px">💡 التلميحات:</h4>
+    <div id="hintsDisplay"></div>
+    <button class="btn-green btn-sm" onclick="requestHint()" style="margin-top:6px">طلب تلميح جديد 💡</button>
+    <hr class="sep">
+    <span class="label">🎯 تخمينات الجاسوس:</span>
+    <div id="spyGuessesDisplay" style="min-height:30px;text-align:right"><p style="color:#555;font-size:.85em">لا يوجد بعد</p></div>
+  </div>
+  <!-- البوس يصوت -->
+  <div id="bossVoteSection" style="display:none" class="card">
+    <h3 style="color:#d4af37;margin-bottom:10px">🗳️ صوّتك يا بوس — من الجاسوس؟</h3>
+    <div id="bossVoteBtns"></div>
+  </div>
+  <div class="card">
+    <h4 style="margin-bottom:8px">📊 التصويت:</h4>
+    <div id="vStats" style="text-align:right;min-height:36px"><p style="color:#555">لا يوجد أصوات بعد</p></div>
+    <hr class="sep">
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px">
+      <button class="btn-green btn-sm" id="btnStartVote" onclick="startVoting()">فتح التصويت 🗳️</button>
+      <button class="btn-orange btn-sm" id="btnReveal" onclick="revealAndScore()" style="display:none">كشف النتيجة 🎯</button>
+      <button class="btn-danger btn-sm" onclick="closeRoom()">إنهاء ❌</button>
+    </div>
+    <div id="joinRequestsGame"></div>
+  </div>
+</div>
+
+<!-- ══ VOICE BAR ══ -->
+<div id="voiceChatBar" style="position:fixed;bottom:44px;left:0;width:100%;background:rgba(10,10,10,.98);padding:8px;border-top:1px solid #333;z-index:490;text-align:center;display:none">
+  <span style="color:gold;font-weight:bold;margin-left:10px;vertical-align:middle">🎙️</span>
+  <button id="joinVoiceBtn" onclick="initVoiceChat()" style="background:#28a745;color:#fff;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">تشغيل المايك</button>
+  <button id="muteBtn" onclick="toggleMute()" style="display:none;background:#ffc107;color:#000;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-weight:bold;width:auto;font-size:13px">كتم 🔇</button>
+  <div id="audioPlayers" style="display:none"></div>
+</div>
+
+<!-- ══ PLAYER GAME ══ -->
+<div id="screen-player-game" class="screen">
+  <div id="playerContent"></div>
+  <div id="voteSection" style="display:none" class="card">
+    <h3 style="margin-bottom:10px;color:#d4af37">🗳️ من هو الجاسوس؟</h3>
+    <div id="voteBtns"></div>
+  </div>
+  <div id="guessSection" style="display:none" class="card">
+    <h3 style="color:#ff6b35;margin-bottom:8px">🕵️ أنت الجاسوس! خمّن الكلمة</h3>
+    <p style="color:#aaa;font-size:.85em;margin-bottom:10px">لو خمّنت صح تفوز حتى لو اكتشفوك!</p>
+    <input type="text" id="guessInput" placeholder="اكتب تخمينك...">
+    <button class="btn-orange" id="guessSendBtn" onclick="submitGuess()">أرسل التخمين 🎯</button>
+    <div id="guessHistoryEl" style="margin-top:8px"></div>
+    <div id="guessResultEl" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ══ CHAT ══ -->
+<div id="chatBox" class="collapsed">
+  <div id="chatHeader" onclick="toggleChat()">
+    <span style="color:#d4af37;font-weight:bold">💬 الدردشة <span id="chatUnread" style="background:#ff4d4d;color:#fff;border-radius:50%;padding:1px 6px;font-size:.75em;display:none">0</span></span>
+    <span id="chatChevron" style="color:#888">▲</span>
+  </div>
+  <div id="chatMessages"></div>
+  <div id="chatInputRow">
+    <input id="chatInput" placeholder="اكتب رسالة..." onkeydown="if(event.key==='Enter')sendChat()">
+    <button id="chatSendBtn" onclick="sendChat()">إرسال</button>
+  </div>
+</div>
+
+<canvas id="qrExportCanvas" style="display:none"></canvas>
+
+<script>
+const socket = io({ reconnection:true, reconnectionAttempts:Infinity, reconnectionDelay:1000, timeout:20000 });
+let myCode='', myName='', isBoss=false, amISpy=false, chatOpen=false, chatUnreadCount=0;
+
+const SS={
+  save(d){try{localStorage.setItem('imp2',JSON.stringify(d))}catch(e){}},
+  load(){try{return JSON.parse(localStorage.getItem('imp2')||'{}')}catch(e){return{}}},
+  clear(){try{localStorage.removeItem('imp2')}catch(e){}}
+};
+
+// ══ Connection ══
+const connBar=document.getElementById('conn-bar');
+socket.on('disconnect',()=>{connBar.textContent='⚠️ انقطع الاتصال...';connBar.className='offline';});
+socket.on('connect',()=>{
+  const s=SS.load();
+  if(!s.code) return;
+  if(s._connected){connBar.textContent='✅ رجع الاتصال!';connBar.className='online';}
+  s._connected=true; SS.save(s);
+  myCode=s.code; myName=s.name; isBoss=s.isBoss;
+  if(isBoss) socket.emit('impBossReconnect',{roomCode:s.code,bossToken:s.bossToken});
+  else{ show('screen-wait'); document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋'; socket.emit('impPlayerReconnect',{roomCode:s.code,playerName:s.name}); }
+});
+socket.on('roomEnded',()=>{SS.clear();showToast('الغرفة أُغلقت',3000);setTimeout(()=>location.reload(),2000);});
+socket.on('impLeftRoom',()=>{SS.clear();location.reload();});
+socket.on('error',(m)=>{showToast('⚠️ '+m,4000);const b=document.getElementById('startBtn');if(b){b.disabled=false;b.textContent='ابدأ الجيم 🚀';}});
+
+// ══ Lobby List ══
+socket.on('impLobbyList',renderLobbyList);
+function renderLobbyList(list){
+  const el=document.getElementById('lobbyListEl');if(!el)return;
+  if(!list.length){el.innerHTML='<p style="color:#555;font-size:.9em">لا توجد غرف مفتوحة حالياً</p>';return;}
+  el.innerHTML=list.map(r=>`<div class="lobby-room-card" onclick="quickJoin('${r.code}')"><span style="color:#d4af37;font-weight:bold">🕵️ ${r.code}</span><span style="color:#aaa;font-size:.85em">${r.players} لاعب ${r.started?'🎮 جاري':'⏳ انتظار'}</span><span style="color:#28a745;font-size:.85em">دخول ←</span></div>`).join('');
+}
+function quickJoin(c){document.getElementById('roomCodeInput').value=c;document.getElementById('roomCodeInput').scrollIntoView({behavior:'smooth'});}
+
+// ══ Create ══
+function showCreateOptions(){document.getElementById('createOptions').style.display='block';}
+function createRoom(){isBoss=true;socket.emit('impCreateRoom',{isPrivate:document.getElementById('isPrivate')?.checked});}
+
+socket.on('impRoomCreated',(c)=>{
+  myCode=c;
+  SS.save({code:c,name:'Boss',isBoss:true,bossToken:socket.id,_connected:false});
+  initBossLobby(c); show('screen-boss-lobby');
+});
+
+function initBossLobby(c){
+  document.getElementById('bossRoomTitle').textContent='الإمبوستر — '+c;
+  document.getElementById('lobbyCode').textContent=c;
+  document.getElementById('bossGameTitle').textContent='البوس — '+c;
+  const qr=document.getElementById('qrcode');qr.innerHTML='';
+  new QRCode(qr,{text:window.location.origin+'/impostor.html?code='+c,width:160,height:160,colorDark:'#000',colorLight:'#fff'});
+}
+
+socket.on('impBossReconnected',(d)=>{
+  initBossLobby(myCode);
+  if(d.started){show('screen-boss-game');if(d.roomData)renderBossGameView(d.roomData);}
+  else{show('screen-boss-lobby');if(d.players)updatePlayerList(d.players);}
+});
+
+// ══ Join ══
+function joinRoom(){
+  const n=document.getElementById('playerName').value.trim();
+  const c=document.getElementById('roomCodeInput').value.trim().toUpperCase();
+  if(!n||!c){showToast('اكتب اسمك والكود!');return;}
+  myCode=c;myName=n;SS.save({code:c,name:n,isBoss:false,_connected:false});
+  socket.emit('impJoinRoom',{roomCode:c,playerName:n});
+}
+socket.on('impWaitingApproval',()=>show('screen-wait-approval'));
+socket.on('impJoinedSuccess',(d)=>{if(!d?.reconnected){show('screen-wait');document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';}});
+socket.on('updatePlayersImp',updatePlayerList);
+function updatePlayerList(players){
+  const list=document.getElementById('pList'),cnt=document.getElementById('pCount');
+  if(!players||!players.length){list.innerHTML='<span style="color:#555">انتظار...</span>';cnt.textContent='';document.getElementById('startBtn').style.display='none';return;}
+  list.innerHTML=players.map(p=>`<span class="player-tag">👤 ${p.name}${p.spectator?' 👀':''}</span>`).join('');
+  cnt.textContent=`✅ ${players.filter(p=>!p.spectator).length} لاعب`;
+  document.getElementById('startBtn').style.display=players.filter(p=>!p.spectator).length>=3?'block':'none';
+}
+
+// طلبات الانضمام
+socket.on('impJoinRequest',(d)=>{
+  const containers=['joinRequests','joinRequestsGame'];
+  containers.forEach(cid=>{
+    const c=document.getElementById(cid);if(!c)return;
+    const div=document.createElement('div');div.className='join-req';div.id='jr_'+d.id;
+    div.innerHTML=`<span>👤 <b>${d.name}</b> يريد الانضمام</span><span><button class="btn-green btn-sm" onclick="approveJoin('${d.id}',true)">قبول ✅</button><button class="btn-danger btn-sm" onclick="approveJoin('${d.id}',false)">رفض ❌</button></span>`;
+    c.appendChild(div);
+  });
+  showToast('🔔 '+d.name+' يريد الانضمام!',5000);
+});
+function approveJoin(id,approve){socket.emit('impApproveJoin',{roomCode:myCode,playerId:id,approve});const el=document.getElementById('jr_'+id);if(el)el.remove();}
+function leaveRoom(){socket.emit('impLeaveRoom',{roomCode:myCode});SS.clear();}
+
+// ══ Start Game ══
+function startGame(){
+  const btn=document.getElementById('startBtn');btn.textContent='الذكاء الاصطناعي بيختار... 🤖';btn.disabled=true;
+  socket.emit('impStartGame',{roomCode:myCode,category:document.getElementById('categorySelect').value,spyCount:parseInt(document.getElementById('spyCountSelect').value)});
+}
+
+// ══ Boss Game View ══
+socket.on('impBossData',(d)=>{
+  show('screen-boss-game');
+  document.getElementById('voiceChatBar').style.display='block';
+  renderBossGameView(d);
+});
+function renderBossGameView(d){
+  document.getElementById('bossCategoryDisplay').textContent=d.category;
+  document.getElementById('bossWordDisplay').textContent=d.word;
+  if(d.spyCount) document.getElementById('bossSpyCount').textContent='عدد الجواسيس: '+d.spyCount;
+  // Boss sees players list WITHOUT roles — he plays normally
+  if(d.players){
+    document.getElementById('bossSecrets').innerHTML=d.players.map(p=>
+      `<p><b style="color:#d4af37">${p.name}</b> — <span style="color:#888">؟؟؟</span></p>`
+    ).join('');
+  }
+  // Show hints if any
+  if(d.hints && d.hints.length) d.hints.forEach(h=>addHint(h));
+}
+// After reveal, boss sees full results
+function renderBossSecretsRevealed(players,spies){
+  document.getElementById('bossSecrets').innerHTML=players.map(p=>{
+    const isSpy=spies.includes(p.name);
+    return `<p><b style="color:#d4af37">${p.name}</b> — <span class="${isSpy?'spy-badge':'normal-badge'}">${isSpy?'🕵️ جاسوس':'✅ طبيعي'}</span></p>`;
+  }).join('');
+}
+function addHint(h){
+  const el=document.getElementById('hintsDisplay');
+  if(el) el.innerHTML+=`<div style="background:#1a2a1a;border:1px solid #2d5a2d;border-radius:6px;padding:6px 10px;margin:3px 0;color:#7fff7f;font-size:.9em">💡 ${h}</div>`;
+}
+
+// البوس يصوت
+socket.on('impBossCanVote',(d)=>{
+  const sec=document.getElementById('bossVoteSection');
+  sec.style.display='block';
+  const btns=document.getElementById('bossVoteBtns');btns.innerHTML='';
+  d.targets.forEach(t=>{
+    const btn=document.createElement('button');btn.className='btn-sm';btn.style.background='#222';btn.style.border='2px solid #555';btn.style.color='#fff';btn.style.borderRadius='8px';btn.style.padding='10px 16px';btn.style.margin='4px';btn.style.width='auto';btn.style.cursor='pointer';
+    btn.textContent=t;
+    btn.onclick=()=>{
+      socket.emit('impBossVote',{roomCode:myCode,target:t});
+      btns.querySelectorAll('button').forEach(b=>b.disabled=true);
+      btn.style.borderColor='#ff4d4d';btn.style.background='#2a0000';
+      btn.textContent+=(' ✓');
+      sec.style.display='none';
+      showToast('✅ تم إرسال صوتك يا بوس!',3000);
+    };
+    btns.appendChild(btn);
+  });
+});
+
+socket.on('impVoteUpdate',(d)=>{
+  let s='';for(let k in d.details)s+=`<p style="text-align:right">${k}: <b style="color:#d4af37">${d.details[k]}</b> أصوات</p>`;
+  s+=`<p style="color:#555;font-size:.75em;text-align:right">إجمالي: ${d.totalVotes}</p>`;
+  document.getElementById('vStats').innerHTML=s;
+});
+
+socket.on('impSpyGuessReceived',(d)=>{
+  const el=document.getElementById('spyGuessesDisplay');
+  const cls=d.result==='صحيح'?'guess-correct':d.result==='قريب'?'guess-close':'guess-wrong';
+  el.innerHTML+=`<div class="${cls}" style="margin:4px 0"><b>${d.by}</b>: "${d.guess}" — ${d.result} ${d.reason?'('+d.reason+')':''}</div>`;
+});
+
+function requestHint(){
+  socket.emit('impRequestHint',{roomCode:myCode});
+  showToast('جاري توليد تلميح...',2000);
+}
+socket.on('impNewHint',(d)=>{addHint(d.hint);showToast('💡 تلميح جديد!',3000);});
+
+function startVoting(){
+  socket.emit('impStartVoting',myCode);
+  document.getElementById('btnStartVote').disabled=true;
+  document.getElementById('btnStartVote').textContent='جاري...';
+  showToast('تم فتح التصويت!',3000);
+}
+socket.on('impVotingStarted',()=>{document.getElementById('btnReveal').style.display='inline-block';showToast('التصويت مفتوح للاعبين!',3000);});
+
+function revealAndScore(){socket.emit('impRevealResult',myCode);document.getElementById('btnReveal').disabled=true;}
+
+// ══ Player Game ══
+socket.on('impGameData',(d)=>{amISpy=d.isSpy;SS.save({...SS.load(),gameData:d});renderPlayerScreen(d);document.getElementById('voiceChatBar').style.display='block';});
+socket.on('impPlayerReconnected',(d)=>{if(d.gameData){amISpy=d.gameData.isSpy;renderPlayerScreen(d.gameData);}else{show('screen-wait');document.getElementById('wait-name').textContent='مرحباً، '+myName+' 👋';}});
+
+function renderPlayerScreen(d){
+  show('screen-player-game');amISpy=d.isSpy;
+  // show previous hints if any
+  if(d.hints && d.hints.length && !d.isSpy){
+    setTimeout(()=>{
+      const el=document.getElementById('playerHints');
+      if(el) d.hints.forEach(h=>el.innerHTML+=`<div style="background:#1a2a1a;border:1px solid #2d5a2d;border-radius:6px;padding:6px 10px;margin:3px 0;color:#7fff7f;font-size:.85em">💡 ${h}</div>`);
+    },300);
+  }
+  const hint=d.spectator?`<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin:8px 0;color:#888">👀 أنت مشاهد فقط</div>`
+    :d.isSpy?`<div style="background:#1a0505;border:1px solid #8b0000;border-radius:8px;padding:10px;margin:8px 0;color:#ff6b6b">🕵️ أنت الجاسوس! حاول تعرف الكلمة السرية من النقاش.</div>`
+    :`<div style="background:#0a1a1a;border:1px solid #1a6a4a;border-radius:8px;padding:10px;margin:8px 0"><span style="color:#888;font-size:.85em">📦 الفئة: </span><b style="color:#7fbfff">${d.category}</b><br><span style="color:#888;font-size:.85em;margin-top:4px;display:block">🔑 الكلمة: </span><b style="color:#00ffcc;font-size:1.3em">${d.word}</b></div>`;
+
+  document.getElementById('playerContent').innerHTML=`
+    <div class="card">
+      <h2 style="color:#d4af37;margin-bottom:8px">${d.name}</h2>
+      ${hint}
+      ${!d.spectator?`<p style="color:#888;font-size:.8em;margin-bottom:6px">اضغط على الكرت لكشف / إخفاء دورك</p>
+      <div class="role-card hidden" onclick="toggleRole(this)">
+        <div class="role-real ${d.isSpy?'spy-badge':'normal-badge'}">${d.isSpy?'🕵️ جاسوس':'✅ طبيعي'}</div>
+        <p style="color:#555;font-size:.75em;margin-top:4px">دورك السري</p>
+      </div>`:''}
+      <div id="playerHints" style="margin-top:8px"></div>
+      <button class="btn-gray btn-sm" style="margin-top:10px" onclick="leaveRoom()">مغادرة 🚪</button>
+    </div>`;
+}
+
+function toggleRole(card){card.classList.toggle('hidden');card.classList.toggle('revealed');}
+
+socket.on('impStartDayVoting',(d)=>{
+  if(!d.canVote) return;
+  const sec=document.getElementById('voteSection');sec.style.display='block';
+  const btns=document.getElementById('voteBtns');btns.innerHTML='';
+  let voted=false;
+  d.targets.forEach(t=>{
+    const btn=document.createElement('button');btn.className='btn-sm';btn.style.background='#222';btn.style.border='2px solid #555';btn.style.color='#fff';btn.style.borderRadius='8px';btn.style.padding='10px 16px';btn.style.margin='4px';btn.style.width='auto';btn.style.cursor='pointer';
+    btn.textContent=t;
+    btn.onclick=()=>{
+      if(voted)return;voted=true;
+      socket.emit('impCastVote',{roomCode:myCode,target:t});
+      btns.querySelectorAll('button').forEach(b=>b.disabled=true);
+      btn.style.borderColor='#ff4d4d';btn.style.background='#2a0000';
+      btn.textContent+=(' ✓');
+      showToast('✅ تم إرسال صوتك!',3000);
+    };
+    btns.appendChild(btn);
+  });
+  if(amISpy) document.getElementById('guessSection').style.display='block';
+});
+
+function submitGuess(){
+  const g=document.getElementById('guessInput').value.trim();
+  if(!g){showToast('اكتب تخمينك!');return;}
+  socket.emit('impSpyGuess',{roomCode:myCode,guess:g});
+  document.getElementById('guessSendBtn').disabled=true;
+  document.getElementById('guessSendBtn').textContent='جاري التحقق... 🤖';
+  showToast('✅ تم إرسال تخمينك، جاري المراجعة...',4000);
+}
+
+socket.on('impGuessHistory',(guesses)=>{
+  const el=document.getElementById('guessHistoryEl');
+  if(!el) return;
+  el.innerHTML=guesses.map(g=>`<div style="background:#1a1a2a;border-radius:6px;padding:5px 8px;margin:3px 0;font-size:.85em">${g.guess} → <b style="color:${g.result==='صحيح'?'#28a745':g.result==='قريب'?'#ffc107':'#dc3545'}">${g.result}</b></div>`).join('');
+});
+socket.on('impGuessResult',(d)=>{
+  const cls=d.result==='صحيح'?'guess-correct':d.result==='قريب'?'guess-close':'guess-wrong';
+  const icon=d.result==='صحيح'?'✅':d.result==='قريب'?'🟡':'❌';
+  document.getElementById('guessResultEl').innerHTML=`<div class="${cls}">${icon} ${d.result}! ${d.reason||''} ${d.result!=='صحيح'?`<br><span style="font-size:.85em;color:#888">الكلمة كانت: ${d.word}</span>`:''}</div>`;
+  document.getElementById('guessSendBtn').style.display='none';
+});
+
+// ══ Result ══
+socket.on('impResult',(d)=>{
+  // now we can show who was spy
+  if(isBoss && d.spies) renderBossSecretsRevealed(
+    Object.values(d).length ? [] : [],  // players not in result, skip
+    d.spies
+  );
+  SS.clear();
+  document.getElementById('resultIcon').textContent = d.icon;
+  
+  const msgEl = document.getElementById('resultMsg');
+  msgEl.innerHTML = '';
+
+  // العنوان
+  const titleEl = document.createElement('b');
+  titleEl.style.fontSize = '1.1em';
+  titleEl.style.display = 'block';
+  titleEl.style.marginBottom = '12px';
+  titleEl.textContent = d.title;
+  msgEl.appendChild(titleEl);
+
+  // الجواسيس
+  const spyRow = document.createElement('p');
+  spyRow.style.marginBottom = '6px';
+  spyRow.innerHTML = `<span style="color:#ff6b35">🕵️ الجواسيس: </span><b>${d.spies.join(' و ')}</b>`;
+  msgEl.appendChild(spyRow);
+
+  // الكلمة
+  const wordRow = document.createElement('p');
+  wordRow.style.marginBottom = '10px';
+  wordRow.innerHTML = `<span style="color:#888">🔑 الكلمة: </span><b style="color:#00ffcc">${d.word}</b>`;
+  msgEl.appendChild(wordRow);
+
+  // تخمين الجاسوس
+  if (d.spyGuess) {
+    const gIcon = d.guessResult === 'صحيح' ? '✅' : d.guessResult === 'قريب' ? '🟡' : '❌';
+    const gColor = d.guessResult === 'صحيح' ? '#28a745' : d.guessResult === 'قريب' ? '#ffc107' : '#dc3545';
+    const guessRow = document.createElement('p');
+    guessRow.style.marginBottom = '6px';
+    guessRow.innerHTML = `🎯 تخمين الجاسوس: "<b>${d.spyGuess}</b>" — <span style="color:${gColor}">${gIcon} ${d.guessResult}</span>`;
+    msgEl.appendChild(guessRow);
+    if (d.guessReason) {
+      const reasonEl = document.createElement('p');
+      reasonEl.style.color = '#888';
+      reasonEl.style.fontSize = '.85em';
+      reasonEl.style.marginBottom = '10px';
+      reasonEl.textContent = d.guessReason;
+      msgEl.appendChild(reasonEl);
+    }
+  }
+
+  // النتيجة النهائية
+  const winEl = document.createElement('p');
+  winEl.style.fontSize = '1.1em';
+  winEl.style.color = '#d4af37';
+  winEl.style.marginTop = '10px';
+  winEl.textContent = d.winnerText;
+  msgEl.appendChild(winEl);
+  const btns=document.getElementById('resultBtns');btns.innerHTML='';
+  if(isBoss){
+    const rb=document.createElement('button');rb.textContent='🔄 نفس الغرفة';rb.style.width='auto';rb.style.padding='10px 16px';
+    rb.onclick=()=>{socket.emit('impRestartGame',{roomCode:myCode});document.getElementById('resultOverlay').classList.remove('active');};
+    btns.appendChild(rb);
+  }
+  const lb=document.createElement('button');lb.className='btn-gray';lb.textContent='خروج 🚪';lb.style.width='auto';lb.style.padding='10px 16px';
+  lb.onclick=()=>{SS.clear();location.reload();};
+  btns.appendChild(lb);
+  document.getElementById('resultOverlay').classList.add('active');
+});
+
+socket.on('impBackToLobby',(d)=>{
+  if(isBoss){show('screen-boss-lobby');if(d.players)updatePlayerList(d.players);}
+  else{show('screen-wait');document.getElementById('wait-name').textContent='انتظر البوس يبدأ جيم جديد...';}
+  showToast('🔄 جيم جديد قريباً!',3000);
+});
+
+// ══ Chat ══
+socket.on('impChatMessage',(d)=>{
+  const msgs=document.getElementById('chatMessages');
+  const div=document.createElement('div');div.className='chat-msg';
+  div.innerHTML=`<span class="chat-from">${d.from}</span><span class="chat-time">${d.time}</span><br>${d.message}`;
+  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+  if(!chatOpen){chatUnreadCount++;const u=document.getElementById('chatUnread');u.textContent=chatUnreadCount;u.style.display='inline';}
+});
+function toggleChat(){
+  chatOpen=!chatOpen;
+  document.getElementById('chatBox').classList.toggle('collapsed',!chatOpen);
+  document.getElementById('chatChevron').textContent=chatOpen?'▼':'▲';
+  if(chatOpen){chatUnreadCount=0;document.getElementById('chatUnread').style.display='none';document.getElementById('chatInput').focus();}
+}
+function sendChat(){
+  const inp=document.getElementById('chatInput');const msg=inp.value.trim();
+  if(!msg||!myCode)return;
+  socket.emit('impChat',{roomCode:myCode,message:msg});inp.value='';
+}
+
+// ══ QR Share as Image ══
+async function shareQRImage(){
+  const qrCanvas=document.querySelector('#qrcode canvas');
+  if(!qrCanvas){showToast('⚠️ انتظر تحميل الـ QR',2000);return;}
+  const url=window.location.origin+'/impostor.html?code='+myCode;
+  const canvas=document.getElementById('qrExportCanvas');
+  const W=320,H=400;canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#0a0a0a';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#d4af37';ctx.lineWidth=3;ctx.strokeRect(6,6,W-12,H-12);
+  ctx.fillStyle='#d4af37';ctx.font='bold 22px Segoe UI';ctx.textAlign='center';ctx.fillText('🕵️ الإمبوستر',W/2,46);
+  const qrSize=200,qrX=(W-qrSize)/2;
+  ctx.fillStyle='#fff';ctx.fillRect(qrX-8,58,qrSize+16,qrSize+16);
+  ctx.drawImage(qrCanvas,qrX,66,qrSize,qrSize);
+  ctx.fillStyle='#fff';ctx.font='bold 28px monospace';ctx.fillText(myCode,W/2,308);
+  ctx.fillStyle='#888';ctx.font='13px Segoe UI';ctx.fillText(url.length>40?url.substring(0,40)+'...':url,W/2,336);
+  ctx.fillStyle='#555';ctx.font='12px Segoe UI';ctx.fillText('امسح الـ QR أو استخدم الكود للانضمام',W/2,365);
+  canvas.toBlob(async(blob)=>{
+    const file=new File([blob],'impostor-'+myCode+'.png',{type:'image/png'});
+    const shareText=`انضم للإمبوستر! كود: ${myCode}\n${url}`;
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({title:'الإمبوستر 🕵️',text:shareText,files:[file]});return;}catch(e){}
+    }
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='impostor-'+myCode+'.png';a.click();
+    showToast('✅ تم تحميل الصورة!',3000);
+  },'image/png');
+}
+
+async function shareLink(){
+  const url=window.location.origin+'/impostor.html?code='+myCode;
+  const text=`انضم للإمبوستر! كود: ${myCode}\n${url}`;
+  if(navigator.share){try{await navigator.share({title:'الإمبوستر',text,url});}catch(e){}}
+  else navigator.clipboard.writeText(text).then(()=>showToast('✅ تم نسخ الرابط!',3000));
+}
+
+// ══ Helpers ══
+function closeRoom(){if(confirm('إغلاق الغرفة؟')){socket.emit('impCloseRoom',myCode);SS.clear();location.reload();}}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.style.display='none');const el=document.getElementById(id);if(el)el.style.display='block';}
+function showToast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',dur);}
+
+window.addEventListener('load',()=>{
+  const code=new URLSearchParams(location.search).get('code');
+  if(code) document.getElementById('roomCodeInput').value=code.toUpperCase();
+  const s=SS.load();
+  if(!s.code||!s._connected){show('screen-home');socket.emit('impGetLobbyList');}
+});
+
+// ══ WebRTC Voice ══
+let localStream; let peers = {};
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+async function initVoiceChat() {
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+    showToast('⚠️ المايك يحتاج HTTPS', 4000); return;
+  }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    document.getElementById('joinVoiceBtn').style.display = 'none';
+    document.getElementById('muteBtn').style.display = 'inline-block';
+    socket.emit('joinVoice', myCode);
+    showToast('🎙️ المايك شغال!', 3000);
+  } catch(e) {
+    showToast('❌ تعذر الوصول للمايك.', 4000);
+  }
+}
+function toggleMute() {
+  if (!localStream) return;
+  const t = localStream.getAudioTracks()[0];
+  t.enabled = !t.enabled;
+  document.getElementById('muteBtn').textContent = t.enabled ? 'كتم 🔇' : 'فتح 🔊';
+}
+socket.on('user-joined-voice', (id) => { if (localStream) createPeer(id, true); });
+socket.on('webrtc-offer', async (d) => {
+  if (!localStream) return;
+  const p = createPeer(d.sender, false);
+  await p.setRemoteDescription(new RTCSessionDescription(d.sdp));
+  const a = await p.createAnswer(); await p.setLocalDescription(a);
+  socket.emit('webrtc-answer', { target: d.sender, sdp: a });
+});
+socket.on('webrtc-answer', (d) => { if (peers[d.sender]) peers[d.sender].setRemoteDescription(new RTCSessionDescription(d.sdp)); });
+socket.on('webrtc-ice-candidate', (d) => { if (peers[d.sender]) peers[d.sender].addIceCandidate(new RTCIceCandidate(d.candidate)); });
+function createPeer(targetId, initiator) {
+  const p = new RTCPeerConnection(rtcConfig); peers[targetId] = p;
+  if(localStream) localStream.getTracks().forEach(t => p.addTrack(t, localStream));
+  p.onicecandidate = e => e.candidate && socket.emit('webrtc-ice-candidate', { target: targetId, candidate: e.candidate });
+  p.ontrack = e => { const a = document.createElement('audio'); a.autoplay=true; a.srcObject=e.streams[0]; document.getElementById('audioPlayers').appendChild(a); };
+  if (initiator) p.createOffer().then(o => { p.setLocalDescription(o); socket.emit('webrtc-offer', { target: targetId, sdp: o }); });
+  return p;
+}
+
+</script>
+</body>
+</html>

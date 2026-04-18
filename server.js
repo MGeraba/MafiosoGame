@@ -1,6 +1,3 @@
-// ════════════════════════════════════════════════════════════════
-//  MAFIOSO GAME — Server (v3 - Redis + Security + Timers)
-// ════════════════════════════════════════════════════════════════
 
 const express = require('express');
 const http = require('http');
@@ -18,158 +15,16 @@ const io = new Server(server, {
 });
 
 // ════════════════════════════════════════════════
-//  Redis (optional — falls back to in-memory)
-// ════════════════════════════════════════════════
-let redis = null;
-let useRedis = false;
-
-async function initRedis() {
-    try {
-        const { createClient } = require('redis');
-        redis = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
-        redis.on('error', (err) => console.warn('Redis error:', err.message));
-        await redis.connect();
-        useRedis = true;
-        console.log('✅ Redis connected');
-    } catch (e) {
-        console.warn('⚠️ Redis not available, using in-memory storage:', e.message);
-        useRedis = false;
-    }
-}
-
-// ════════════════════════════════════════════════
-//  Room Storage Adapter (Redis or Memory)
-// ════════════════════════════════════════════════
-class RoomStore {
-    constructor(prefix) {
-        this.prefix = prefix;
-        this.memory = {};
-    }
-
-    async get(code) {
-        if (useRedis) {
-            try {
-                const data = await redis.get(`${this.prefix}:${code}`);
-                return data ? JSON.parse(data) : null;
-            } catch (e) {
-                return this.memory[code] || null;
-            }
-        }
-        return this.memory[code] || null;
-    }
-
-    async set(code, room) {
-        room._lastActivity = Date.now();
-        this.memory[code] = room;
-        if (useRedis) {
-            try {
-                await redis.set(`${this.prefix}:${code}`, JSON.stringify(room), { EX: 3600 }); // 1hr TTL
-            } catch (e) {}
-        }
-    }
-
-    async del(code) {
-        delete this.memory[code];
-        if (useRedis) {
-            try { await redis.del(`${this.prefix}:${code}`); } catch (e) {}
-        }
-    }
-
-    getAll() {
-        return this.memory;
-    }
-
-    entries() {
-        return Object.entries(this.memory);
-    }
-}
-
-// Sync wrapper for backward compatibility — rooms still accessed synchronously in handlers
-// We keep memory as primary and sync to Redis in background
-let rooms = {};     // المافيوسو تريال
-let mcRooms = {};   // المافيا الكلاسيك
-let impRooms = {};  // الإمبوستر
-
-// ════════════════════════════════════════════════
-//  Rate Limiting
-// ════════════════════════════════════════════════
-const rateLimits = new Map(); // socketId -> { count, resetTime }
-
-function rateLimit(socketId, maxPerMinute = 30) {
-    const now = Date.now();
-    let entry = rateLimits.get(socketId);
-    if (!entry || now > entry.resetTime) {
-        entry = { count: 0, resetTime: now + 60000 };
-        rateLimits.set(socketId, entry);
-    }
-    entry.count++;
-    if (entry.count > maxPerMinute) {
-        return false; // rate limited
-    }
-    return true;
-}
-
-// Clean up rate limit entries every 5 min
-setInterval(() => {
-    const now = Date.now();
-    for (const [id, entry] of rateLimits) {
-        if (now > entry.resetTime) rateLimits.delete(id);
-    }
-}, 5 * 60 * 1000);
-
-// ════════════════════════════════════════════════
-//  Auto Cleanup — delete inactive rooms
-// ════════════════════════════════════════════════
-const ROOM_TTL = 30 * 60 * 1000; // 30 minutes
-
-function autoCleanup() {
-    const now = Date.now();
-    for (const code in rooms) {
-        if (rooms[code]._lastActivity && now - rooms[code]._lastActivity > ROOM_TTL) {
-            io.to(code).emit('roomEnded');
-            delete rooms[code];
-            console.log(`🧹 Auto-cleaned room: ${code}`);
-        }
-    }
-    for (const code in mcRooms) {
-        if (mcRooms[code]._lastActivity && now - mcRooms[code]._lastActivity > ROOM_TTL) {
-            io.to('mc_' + code).emit('roomEnded');
-            delete mcRooms[code];
-            console.log(`🧹 Auto-cleaned mc room: ${code}`);
-        }
-    }
-    for (const code in impRooms) {
-        if (impRooms[code]._lastActivity && now - impRooms[code]._lastActivity > ROOM_TTL) {
-            io.to('imp_' + code).emit('roomEnded');
-            delete impRooms[code];
-            console.log(`🧹 Auto-cleaned imp room: ${code}`);
-        }
-    }
-}
-
-setInterval(autoCleanup, 5 * 60 * 1000);
-
-// ════════════════════════════════════════════════
-//  Input Validation
-// ════════════════════════════════════════════════
-function sanitize(str, maxLen = 50) {
-    if (typeof str !== 'string') return '';
-    return str.trim().substring(0, maxLen).replace(/[<>]/g, '');
-}
-
-function isValidCode(code) {
-    return typeof code === 'string' && /^[A-Z0-9]{4}$/.test(code);
-}
-
-// ════════════════════════════════════════════════
 //  Multi-AI Setup
 // ════════════════════════════════════════════════
 const GEMINI_KEYS = [
     process.env.GEMINI_KEY,
+    
 ].filter(Boolean);
 
 const GROQ_KEYS = [
     process.env.GROQ_KEY,
+    
 ].filter(Boolean);
 
 let geminiIndex = 0, groqIndex = 0;
@@ -235,12 +90,15 @@ async function getAIResponse(prompt) {
 app.use(express.static('public'));
 
 // ════════════════════════════════════════════════
+//  Rooms — كل لعبة لها rooms منفصلة
+// ════════════════════════════════════════════════
+let rooms = {};     // المافيوسو تريال (الأصلية)
+let mcRooms = {};   // المافيا الكلاسيك
+let impRooms = {};  // الإمبوستر
+
+// ════════════════════════════════════════════════
 //  Helpers
 // ════════════════════════════════════════════════
-function touchRoom(room) {
-    room._lastActivity = Date.now();
-}
-
 function checkWinCondition(room) {
     const alivePlayers = room.players.filter(p => p.alive);
     const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
@@ -255,30 +113,12 @@ function checkWinCondition(room) {
 }
 
 // ════════════════════════════════════════════════
-//  Load Game Modules
+//  Socket Events
 // ════════════════════════════════════════════════
-const registerMafiaClassic = require('./mafia-classic-server');
-const registerImpostor = require('./impostor-server');
-
 // ════════════════════════════════════════════════
 //  Socket Events
 // ════════════════════════════════════════════════
 io.on('connection', (socket) => {
-
-    // Rate limit middleware
-    const originalOn = socket.on.bind(socket);
-    socket.on = function(event, handler) {
-        if (['connect', 'disconnect', 'error'].includes(event)) {
-            return originalOn(event, handler);
-        }
-        return originalOn(event, (...args) => {
-            if (!rateLimit(socket.id)) {
-                socket.emit('error', 'أنت بتبعت رسائل كتير! استنى شوية.');
-                return;
-            }
-            handler(...args);
-        });
-    };
 
     // ══════════════════════════════════════════════
     //  ① المافيوسو تريال (الأصلية)
@@ -294,8 +134,7 @@ io.on('connection', (socket) => {
             clues: [],
             round: 1,
             started: false,
-            gameOver: false,
-            _lastActivity: Date.now()
+            gameOver: false
         };
         socket.join(roomCode);
         socket.emit('roomCreated', roomCode);
@@ -303,13 +142,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('bossReconnect', ({ roomCode, bossToken }) => {
-        if (!isValidCode(roomCode)) return;
         const room = rooms[roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
         if (room.bossToken !== bossToken) { socket.emit('error', 'غير مصرح'); return; }
         if (room.deleteTimer) { clearTimeout(room.deleteTimer); room.deleteTimer = null; }
         room.boss = socket.id;
-        touchRoom(room);
         socket.join(roomCode);
         socket.emit('bossReconnected', {
             players: room.players,
@@ -321,15 +158,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('joinRoom', (data) => {
-        if (!data || !isValidCode(data.roomCode)) return;
-        const playerName = sanitize(data.playerName, 20);
-        if (!playerName) { socket.emit('error', 'اسم غير صالح'); return; }
-        
         const room = rooms[data.roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
-        touchRoom(room);
-        
-        const existing = room.players.find(p => p.name === playerName);
+        const existing = room.players.find(p => p.name === data.playerName);
         if (existing) {
             existing.id = socket.id;
             socket.join(data.roomCode);
@@ -346,8 +177,7 @@ io.on('connection', (socket) => {
             }
         } else {
             if (room.started) { socket.emit('error', 'اللعبة بدأت خلاص!'); return; }
-            if (room.players.length >= 20) { socket.emit('error', 'الغرفة ممتلئة!'); return; }
-            room.players.push({ id: socket.id, name: playerName, role: 'مواطن', alive: true, charName: '', secret: '' });
+            room.players.push({ id: socket.id, name: data.playerName, role: 'مواطن', alive: true, charName: '', secret: '' });
             socket.join(data.roomCode);
             socket.emit('joinedSuccess', { reconnected: false });
         }
@@ -355,10 +185,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('playerReconnect', (data) => {
-        if (!data || !isValidCode(data.roomCode)) return;
         const room = rooms[data.roomCode];
         if (!room) { socket.emit('roomEnded'); return; }
-        touchRoom(room);
         const existing = room.players.find(p => p.name === data.playerName);
         if (existing) {
             existing.id = socket.id;
@@ -380,19 +208,13 @@ io.on('connection', (socket) => {
     });
 
     socket.on('startGame', async (data) => {
-        if (!data || !isValidCode(data.roomCode)) return;
         const room = rooms[data.roomCode];
         if (!room || room.players.length === 0) return;
-        if (socket.id !== room.boss) return;
         room.started = true;
         room.clues = [];
-        touchRoom(room);
-
-        const crimeType = sanitize(data.crimeType || '', 100);
-        const tricks = sanitize(data.tricks || '', 200);
 
         const names = room.players.map(p => p.name).join(', ');
-        const prompt = `أنت مؤلف لعبة مافيا محترف باللهجة المصرية. اللاعبون هم: [${names}]. \nالجريمة: ${crimeType || "جريمة غامضة"}. تريكات: ${tricks || "لا يوجد"}.\nاكتب قصة جريمة مصرية مشوقة ووزع أسامي شخصيات وأسرار لكل لاعب.\nالرد JSON فقط بدون أي نص خارجه:\n{"story": "القصة هنا بالتفصيل", "assignments": [{"name": "الاسم الحقيقي", "charName": "اسم الشخصية", "secret": "السر الخاص بالشخصية"}]}`;
+        const prompt = `أنت مؤلف لعبة مافيا محترف باللهجة المصرية. اللاعبون هم: [${names}]. \nالجريمة: ${data.crimeType || "جريمة غامضة"}. تريكات: ${data.tricks || "لا يوجد"}.\nاكتب قصة جريمة مصرية مشوقة ووزع أسامي شخصيات وأسرار لكل لاعب.\nالرد JSON فقط بدون أي نص خارجه:\n{"story": "القصة هنا بالتفصيل", "assignments": [{"name": "الاسم الحقيقي", "charName": "اسم الشخصية", "secret": "السر الخاص بالشخصية"}]}`;
 
         const response = await getAIResponse(prompt);
         if (!response) {
@@ -409,9 +231,9 @@ io.on('connection', (socket) => {
             const match = cleanedResponse.match(/\{[\s\S]*\}/);
             if (match) { 
                 try { scenario = JSON.parse(match[0]); } 
-                catch(e2) { io.to(room.boss).emit('error', 'التنسيق باظ، دوس "ابدأ الجيم" تاني!'); room.started = false; return; } 
+                catch(e2) { io.to(room.boss).emit('error', 'الذكاء الاصطناعي كتب قصة بس التنسيق باظ، دوس "ابدأ الجيم" تاني!'); room.started = false; return; } 
             } else { 
-                io.to(room.boss).emit('error', 'الذكاء الاصطناعي ماردش بتنسيق صحيح، حاول تاني!'); room.started = false; return; 
+                io.to(room.boss).emit('error', 'الذكاء الاصطناعي ماردش بتنسيق صحيح، دوس "ابدأ الجيم" تاني!'); room.started = false; return; 
             }
         }
 
@@ -459,22 +281,15 @@ io.on('connection', (socket) => {
         } catch (e) { console.error("Clue parse error"); }
     }
 
-    socket.on('requestPhysicalClue', (roomCode) => {
-        if (!isValidCode(roomCode)) return;
-        sendClue(roomCode);
-    });
+    socket.on('requestPhysicalClue', (roomCode) => sendClue(roomCode));
 
-    socket.on('shareClue', (data) => {
-        if (!data || !isValidCode(data.roomCode)) return;
-        io.to(data.roomCode).emit('clueShared', data.clue);
-    });
+    socket.on('shareClue', (data) => { io.to(data.roomCode).emit('clueShared', data.clue); });
 
     socket.on('triggerPanic', async (roomCode) => {
-        if (!isValidCode(roomCode)) return;
         const room = rooms[roomCode];
         io.to(roomCode).emit('panicAction');
         if (room?.scenario) {
-            const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. \nاللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.\nاكتب حدثاً مفاجئاً (Plot Twist) يغير مجرى التحقيق.\nالرد JSON فقط: {"twist": "نص التويست هنا"}`;
+            const prompt = `في لعبة مافيا مصرية، القصة: ${room.scenario.story}. \nاللاعبون الأحياء: ${room.players.filter(p=>p.alive).map(p=>p.charName).join(', ')}.\nاكتب حدثاً مفاجئاً (Plot Twist) يغير مجرى التحقيق.\nالرد يجب أن يكون JSON فقط بهذا الشكل: {"twist": "نص التويست هنا"}`;
             const response = await getAIResponse(prompt);
             if (response) {
                 try {
@@ -486,18 +301,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('shareTwist', (data) => {
-        if (!data || !isValidCode(data.roomCode)) return;
-        io.to(data.roomCode).emit('twistShared', data.twist);
-    });
+    socket.on('shareTwist', (data) => { io.to(data.roomCode).emit('twistShared', data.twist); });
 
     socket.on('startVotingPhase', (roomCode) => {
-        if (!isValidCode(roomCode)) return;
         const room = rooms[roomCode];
         if (!room) return;
-        touchRoom(room);
         
-        const VOTING_TIME = 30;
+        const VOTING_TIME = 30; // ثواني
         
         const alivePlayers = room.players.filter(p => p.alive);
         const aliveMafia = alivePlayers.filter(p => p.role.includes('🔪'));
@@ -530,7 +340,7 @@ io.on('connection', (socket) => {
         }
         io.to(room.boss).emit('votingStarted', { timer: VOTING_TIME });
         
-        room._votingTimer = setTimeout(() => {
+        setTimeout(() => {
             if(room && room.votes && Object.keys(room.votes).length > 0) {
                 io.to(room.boss).emit('timerExpired', { phase: 'voting', autoExecute: true });
             }
@@ -538,60 +348,58 @@ io.on('connection', (socket) => {
     });
 
     socket.on('castVote', (data) => {
-        if (!data || !isValidCode(data.roomCode)) return;
         const room = rooms[data.roomCode];
         if (!room) return;
-        touchRoom(room);
-        room.votes[socket.id] = sanitize(data.votedForChar, 30);
+        room.votes[socket.id] = data.votedForChar;
         const counts = {};
         Object.values(room.votes).forEach(v => counts[v] = (counts[v] || 0) + 1);
         io.to(room.boss).emit('voteResultUpdate', { totalVotes: Object.keys(room.votes).length, details: counts });
     });
     
     socket.on('ghostMessage', ({ roomCode, message }) => {
-        if (!isValidCode(roomCode)) return;
         const room = rooms[roomCode];
         if (!room) return;
+        
         const sender = room.players.find(p => p.id === socket.id);
         if (!sender || sender.alive) return;
-        const safeMsg = sanitize(message, 200);
+        
         const deadPlayers = room.players.filter(p => !p.alive);
         deadPlayers.forEach(p => {
             io.to(p.id).emit('ghostMessage', {
                 name: sender.charName || sender.name,
-                message: safeMsg,
+                message: message,
                 time: new Date().toLocaleTimeString('ar-EG')
             });
         });
     });
     
     socket.on('requestSpectatorData', (roomCode) => {
-        if (!isValidCode(roomCode)) return;
         const room = rooms[roomCode];
         if (!room) return;
+        
         const player = room.players.find(p => p.id === socket.id);
         if (!player || player.alive) return;
+        
         socket.emit('spectatorData', {
             allPlayers: room.players.map(p => ({
-                name: p.name, charName: p.charName, role: p.role,
-                secret: p.secret, alive: p.alive
+                name: p.name,
+                charName: p.charName,
+                role: p.role,
+                secret: p.secret,
+                alive: p.alive
             })),
             clues: room.clues || []
         });
     });
     
     socket.on('executePlayer', (roomCode) => {
-        if (!isValidCode(roomCode)) return;
         const room = rooms[roomCode];
         if (!room) return;
-        if (socket.id !== room.boss) return;
-        touchRoom(room);
-        
         const counts = {};
         Object.values(room.votes).forEach(v => counts[v] = (counts[v] || 0) + 1);
         const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
         if (!sorted.length) { io.to(room.boss).emit('error', 'مفيش تصويت لسه!'); return; }
-        if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) { io.to(room.boss).emit('error', 'في تعادل في التصويت!'); return; }
+        if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) { io.to(room.boss).emit('error', 'في تعادل في التصويت! خلّي اللاعبين يتناقشوا وصوّتوا تاني.'); return; }
 
         const kickedChar = sorted[0][0];
         const p = room.players.find(pl => pl.charName === kickedChar);
@@ -602,16 +410,16 @@ io.on('connection', (socket) => {
         let execMsg = '';
         if (isMafia) {
             const remainingMafia = win.aliveMafia.length;
-            if (win.over && win.winner === 'civilians') execMsg = `🎉 انتصرت المدينة! "${kickedChar}" كان المافيوسو الأخير!`;
+            if (win.over && win.winner === 'civilians') execMsg = `🎉 انتصرت المدينة! "${kickedChar}" كان المافيوسو الأخير! اللعبة انتهت.`;
             else execMsg = `✅ أصبتم! "${kickedChar}" كان مافيوسو 🔪 — لا يزال ${remainingMafia} مافيا في الخفاء...`;
         } else {
-            execMsg = `😢 "${kickedChar}" كان مواطناً بريئاً. المافيا لا تزال حرة!`;
+            execMsg = `😢 يا نهار أبيض! "${kickedChar}" كان مواطناً بريئاً. المدينة خسرت رجلاً صالحاً والمافيا لا تزال حرة!`;
         }
 
         io.to(roomCode).emit('executionResult', { charName: kickedChar, isMafia, message: execMsg, gameOver: win.over, winner: win.winner });
 
         if (win.over) {
-            let finalMsg = win.winner === 'civilians' ? '🏆 المدينة انتصرت!' : '💀 المافيا كسبت!';
+            let finalMsg = win.winner === 'civilians' ? `🏆 المدينة انتصرت! تم القضاء على المافيا كلها!` : `💀 المافيا كسبت! استولوا على المدينة!`;
             setTimeout(() => { io.to(roomCode).emit('gameOver', finalMsg); if (rooms[roomCode]) rooms[roomCode].gameOver = true; }, 4000);
         } else {
             room.round++;
@@ -620,21 +428,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('closeRoom', (roomCode) => {
-        if (!isValidCode(roomCode)) return;
-        io.to(roomCode).emit('roomEnded');
-        delete rooms[roomCode];
-    });
+    socket.on('closeRoom', (roomCode) => { io.to(roomCode).emit('roomEnded'); delete rooms[roomCode]; console.log('Room closed:', roomCode); });
 
     // WebRTC Signaling
-    socket.on('joinVoice', (roomCode) => {
-        if (!isValidCode(roomCode)) return;
-        socket.join(`${roomCode}-voice`);
-        socket.to(`${roomCode}-voice`).emit('user-joined-voice', socket.id);
-    });
-    socket.on('webrtc-offer', (data) => { if (data?.target) io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp }); });
-    socket.on('webrtc-answer', (data) => { if (data?.target) io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp }); });
-    socket.on('webrtc-ice-candidate', (data) => { if (data?.target) io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate }); });
+    socket.on('joinVoice', (roomCode) => { socket.join(`${roomCode}-voice`); socket.to(`${roomCode}-voice`).emit('user-joined-voice', socket.id); });
+    socket.on('webrtc-offer', (data) => { io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp }); });
+    socket.on('webrtc-answer', (data) => { io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp }); });
+    socket.on('webrtc-ice-candidate', (data) => { io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate }); });
 
     // ══════════════════════════════════════════════
     //  ② المافيا الكلاسيك
@@ -650,13 +450,11 @@ io.on('connection', (socket) => {
     //  Disconnect
     // ══════════════════════════════════════════════
     socket.on('disconnect', () => {
-        rateLimits.delete(socket.id);
-        
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
             if (room.boss === socket.id) {
                 room.deleteTimer = setTimeout(() => {
-                    if (rooms[roomCode]) { io.to(roomCode).emit('roomEnded'); delete rooms[roomCode]; }
+                    if (rooms[roomCode]) { io.to(roomCode).emit('roomEnded'); delete rooms[roomCode]; console.log(`Room ${roomCode} deleted.`); }
                 }, 10 * 60 * 1000);
                 break;
             }
@@ -681,24 +479,19 @@ io.on('connection', (socket) => {
         }
     });
 });
+// ════════════════════════════════════════════════
+//  Load Game Modules
+// ════════════════════════════════════════════════
+const registerMafiaClassic = require('./mafia-classic-server');
+const registerImpostor = require('./impostor-server');
 
 // ════════════════════════════════════════════════
-//  Keep-alive
+//  Keep-alive (يمنع الـ 502 على الاستضافة المجانية)
 // ════════════════════════════════════════════════
 setInterval(() => { console.log('💓 Keep-alive'); }, 10 * 60 * 1000);
 
-// ════════════════════════════════════════════════
-//  Start
-// ════════════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
-
-async function start() {
-    await initRedis();
-    server.listen(PORT, () => {
-        console.log(`✅ Server on port ${PORT}`);
-        console.log(`🤖 Gemini: ${GEMINI_KEYS.length} keys | Groq: ${GROQ_KEYS.length} keys`);
-        console.log(`💾 Storage: ${useRedis ? 'Redis' : 'In-Memory'}`);
-    });
-}
-
-start();
+server.listen(PORT, () => {
+    console.log(`✅ Server on port ${PORT}`);
+    console.log(`🤖 Gemini: ${GEMINI_KEYS.length} keys | Groq: ${GROQ_KEYS.length} keys`);
+});
